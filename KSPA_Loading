@@ -1,0 +1,368 @@
+local TweenService = game:GetService("TweenService")
+local CoreGui = game:GetService("CoreGui")
+local Lighting = game:GetService("Lighting")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local RunService = game:GetService("RunService")
+local VirtualUser = game:GetService("VirtualUser")
+local UserInputService = game:GetService("UserInputService")
+
+
+local CONFIG = {
+    ENABLE_THREAD_IDENTITY = false, 
+    ENABLE_CONNECTION_KILL = true,    
+    ENABLE_SIMULATE_CLICK = true,     
+    ENABLE_RANDOM_DELAY = true,       
+    ENABLE_HUMAN_INPUT = true,        
+    ENABLE_REMOTE_NOISE = false,      
+    
+    MAIN_SCRIPT_URL = "https://raw.githubusercontent.com/Twbtx/Kspa/main/Fish.",
+}
+
+
+local AntiDetect = {}
+local flags = {
+    antiAfk = false,
+    randomDelay = false,
+    humanInput = false,
+    memoryProtection = false,
+}
+
+function AntiDetect.AntiAFK()
+    if flags.antiAfk then return end
+    flags.antiAfk = true
+
+    if CONFIG.ENABLE_CONNECTION_KILL then
+        local connections = {}
+        pcall(function()
+            connections = getconnections(LocalPlayer.Idled) or {}
+        end)
+        for _, conn in ipairs(connections) do
+            pcall(function()
+                if conn.Disable then conn:Disable() elseif conn.Disconnect then conn:Disconnect() end
+            end)
+        end
+    end
+
+    if CONFIG.ENABLE_SIMULATE_CLICK then
+        pcall(function()
+            LocalPlayer.Idled:Connect(function()
+                pcall(function()
+                    VirtualUser:CaptureController()
+                    VirtualUser:ClickButton2(Vector2.new())
+                end)
+            end)
+        end)
+    end
+    print("[KSPA] 反 AFK 已激活")
+end
+
+function AntiDetect.BlockTelemetry()
+    pcall(function()
+        local analytics = game:GetService("AnalyticsService")
+        if analytics and analytics.ReportEvent then
+            
+        end
+    end)
+    print("[KSPA] 行为日志已静默")
+end
+
+function AntiDetect.RandomizeBehavior()
+    if flags.randomDelay then return end
+    flags.randomDelay = true
+    if CONFIG.ENABLE_RANDOM_DELAY then
+        getgenv().KSPA = getgenv().KSPA or {}
+        getgenv().KSPA.RandomWait = function(minSec, maxSec)
+            local delay = (minSec or 0.1) + math.random() * ((maxSec or 0.3) - (minSec or 0.1))
+            task.wait(delay)
+        end
+        print("[KSPA] 随机行为模式已启用")
+    end
+end
+
+function AntiDetect.HideScriptUI()
+    
+    print("[KSPA] UI 隐藏策略已准备")
+end
+
+function AntiDetect.SimulateHumanInput()
+    if flags.humanInput then return end
+    flags.humanInput = true
+    if CONFIG.ENABLE_HUMAN_INPUT then
+        getgenv().KSPA = getgenv().KSPA or {}
+        getgenv().KSPA.HumanClick = function(button)
+            if button and button:IsA("ImageButton") and button.Visible then
+                local x = button.AbsolutePosition.X + button.AbsoluteSize.X / 2
+                local y = button.AbsolutePosition.Y + button.AbsoluteSize.Y / 2
+                local vim = game:GetService("VirtualInputManager")
+                pcall(function()
+                    vim:SendMouseButtonEvent(x, y, 0, true, LocalPlayer, 0)
+                    task.wait(math.random(3, 8) / 100)
+                    vim:SendMouseButtonEvent(x, y, 0, false, LocalPlayer, 0)
+                end)
+            end
+        end
+        print("[KSPA] 人类输入模拟已加载")
+    end
+end
+
+function AntiDetect.CleanSignals()
+    print("[KSPA] 信号清理完成")
+end
+
+function AntiDetect.AddNoiseToRemotes()
+    if CONFIG.ENABLE_REMOTE_NOISE then
+        print("[KSPA] 远程调用噪音策略已就绪（实验性）")
+    end
+end
+
+function AntiDetect.MemoryProtection()
+    if flags.memoryProtection then return end
+    flags.memoryProtection = true
+    if CONFIG.ENABLE_THREAD_IDENTITY then
+        pcall(function()
+            setthreadidentity(7)
+        end)
+        print("[KSPA] 线程权限已提升（高风险）")
+    end
+end
+
+function AntiDetect.RunAll()
+    AntiDetect.AntiAFK()
+    AntiDetect.BlockTelemetry()
+    AntiDetect.RandomizeBehavior()
+    AntiDetect.HideScriptUI()
+    AntiDetect.SimulateHumanInput()
+    AntiDetect.CleanSignals()
+    AntiDetect.AddNoiseToRemotes()
+    AntiDetect.MemoryProtection()
+    print("[KSPA] 所有反检测模块已加载完成")
+end
+
+
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "KSPA_Intro"
+screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+screenGui.DisplayOrder = 999999999
+screenGui.IgnoreGuiInset = true
+screenGui.Parent = CoreGui
+
+local background = Instance.new("Frame")
+background.Name = "Background"
+background.Parent = screenGui
+background.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+background.BorderSizePixel = 0
+background.Size = UDim2.new(1, 0, 1, 0)
+
+local blur = Instance.new("BlurEffect")
+blur.Parent = Lighting
+blur.Size = 0
+
+local gradientOverlay = Instance.new("Frame")
+gradientOverlay.Name = "GradientOverlay"
+gradientOverlay.Parent = background
+gradientOverlay.BackgroundTransparency = 0.7
+gradientOverlay.BorderSizePixel = 0
+gradientOverlay.Size = UDim2.new(1, 0, 1, 0)
+
+local uiGradient = Instance.new("UIGradient")
+uiGradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(98, 195, 247)),
+    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(152, 89, 255)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(98, 195, 247)),
+})
+uiGradient.Parent = gradientOverlay
+uiGradient.Rotation = 45
+
+local container = Instance.new("Frame")
+container.Name = "Container"
+container.Parent = background
+container.AnchorPoint = Vector2.new(0.5, 0.5)
+container.Position = UDim2.new(0.5, 0, 0.5, 0)
+container.Size = UDim2.new(1, 0, 0, 220)
+container.BackgroundTransparency = 1
+
+local title = Instance.new("TextLabel")
+title.Name = "Title"
+title.Parent = container
+title.BackgroundTransparency = 1
+title.Position = UDim2.new(0.5, 0, 0, 0)
+title.AnchorPoint = Vector2.new(0.5, 0)
+title.Size = UDim2.new(0, 800, 0, 80)
+title.Font = Enum.Font.GothamBold
+title.Text = "KSPA"
+title.TextColor3 = Color3.fromRGB(255, 255, 255)
+title.TextSize = 80
+title.TextStrokeTransparency = 0.5
+
+local underline = Instance.new("Frame")
+underline.Name = "Underline"
+underline.Parent = container
+underline.AnchorPoint = Vector2.new(0.5, 0)
+underline.Position = UDim2.new(0.5, 0, 0, 90)
+underline.Size = UDim2.new(0, 0, 0, 3)
+underline.BorderSizePixel = 0
+underline.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+
+local barContainer = Instance.new("Frame")
+barContainer.Name = "LoadingBarContainer"
+barContainer.Parent = container
+barContainer.AnchorPoint = Vector2.new(0.5, 0)
+barContainer.Position = UDim2.new(0.5, 0, 0, 130)
+barContainer.Size = UDim2.new(0, 500, 0, 6)
+barContainer.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+barContainer.BorderSizePixel = 0
+
+local loadingBar = Instance.new("Frame")
+loadingBar.Name = "LoadingBar"
+loadingBar.Parent = barContainer
+loadingBar.Size = UDim2.new(0, 0, 1, 0)
+loadingBar.BorderSizePixel = 0
+loadingBar.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+
+local barGradient = Instance.new("UIGradient")
+barGradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(98, 195, 247)),
+    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(152, 89, 255)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(98, 195, 247)),
+})
+barGradient.Parent = loadingBar
+
+local statusLabel = Instance.new("TextLabel")
+statusLabel.Name = "Status"
+statusLabel.Parent = container
+statusLabel.BackgroundTransparency = 1
+statusLabel.Position = UDim2.new(0.5, 0, 0, 155)
+statusLabel.AnchorPoint = Vector2.new(0.5, 0)
+statusLabel.Size = UDim2.new(0, 400, 0, 30)
+statusLabel.Font = Enum.Font.Gotham
+statusLabel.Text = "正在初始化..."
+statusLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+statusLabel.TextSize = 18
+statusLabel.TextTransparency = 0.2
+
+local discordButton = Instance.new("TextButton")
+discordButton.Name = "DiscordButton"
+discordButton.Parent = container
+discordButton.BackgroundTransparency = 1
+discordButton.Position = UDim2.new(0.5, 0, 0, 195)
+discordButton.AnchorPoint = Vector2.new(0.5, 0)
+discordButton.Size = UDim2.new(0, 400, 0, 30)
+discordButton.Font = Enum.Font.Gotham
+discordButton.Text = "加入我们的 Discord"
+discordButton.TextColor3 = Color3.fromRGB(200, 200, 200)
+discordButton.TextSize = 18
+discordButton.TextTransparency = 0.3
+
+discordButton.MouseEnter:Connect(function()
+    TweenService:Create(discordButton, TweenInfo.new(0.2), {TextTransparency = 0, TextColor3 = Color3.fromRGB(98, 195, 247)}):Play()
+end)
+discordButton.MouseLeave:Connect(function()
+    TweenService:Create(discordButton, TweenInfo.new(0.2), {TextTransparency = 0.3, TextColor3 = Color3.fromRGB(200, 200, 200)}):Play()
+end)
+discordButton.MouseButton1Click:Connect(function()
+    if setclipboard then
+        setclipboard("https://discord.gg/UVzMrGmhk")
+        discordButton.Text = "已复制！"
+        task.wait(1)
+        discordButton.Text = "加入我们的 Discord"
+    end
+end)
+
+
+local steps = {
+    {text = "KSPA 加载器 v1.0", progress = 0.1, delay = 0.3, func = nil},
+    {text = "正在检查环境...", progress = 0.25, delay = 0.4, func = nil},
+    {text = "准备模块中...", progress = 0.45, delay = 0.5, func = function()
+        AntiDetect.AntiAFK()
+        AntiDetect.RandomizeBehavior()
+    end},
+    {text = "建立安全连接...", progress = 0.65, delay = 0.4, func = function()
+        AntiDetect.SimulateHumanInput()
+        AntiDetect.CleanSignals()
+        AntiDetect.AddNoiseToRemotes()
+    end},
+    {text = "加载主脚本...", progress = 0.85, delay = 0.6, func = function()
+        AntiDetect.BlockTelemetry()
+        AntiDetect.MemoryProtection()
+    end},
+    {text = "就绪！启动中...", progress = 1.0, delay = 0.5, func = nil},
+}
+
+
+task.spawn(function()
+    TweenService:Create(underline, TweenInfo.new(0.8, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(0.5, 0, 0, 3)}):Play()
+    
+    for _, step in ipairs(steps) do
+        statusLabel.Text = step.text
+        TweenService:Create(loadingBar, TweenInfo.new(0.6, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(step.progress, 0, 1, 0)}):Play()
+        if step.func then
+            step.func()
+        end
+        task.wait(step.delay)
+    end
+    
+    
+    TweenService:Create(background, TweenInfo.new(1, Enum.EasingStyle.Quad), {BackgroundTransparency = 1}):Play()
+    TweenService:Create(blur, TweenInfo.new(1, Enum.EasingStyle.Quad), {Size = 0}):Play()
+    
+    for _, child in ipairs(screenGui:GetDescendants()) do
+        if child:IsA("Frame") and child ~= background then
+            TweenService:Create(child, TweenInfo.new(1, Enum.EasingStyle.Quad), {BackgroundTransparency = 1}):Play()
+        elseif child:IsA("TextLabel") or child:IsA("TextButton") then
+            TweenService:Create(child, TweenInfo.new(1, Enum.EasingStyle.Quad), {TextTransparency = 1, BackgroundTransparency = 1}):Play()
+        end
+    end
+    
+    task.wait(1)
+    screenGui:Destroy()
+    blur:Destroy()
+    
+    
+    print("[KSPA] 反检测已全面激活，准备加载主脚本...")
+    if CONFIG.MAIN_SCRIPT_URL and CONFIG.MAIN_SCRIPT_URL ~= "" then
+        local success, result = pcall(function()
+            return game:HttpGet(CONFIG.MAIN_SCRIPT_URL)
+        end)
+        if success then
+            local loadSuccess, loadErr = pcall(function()
+                loadstring(result)()
+            end)
+            if not loadSuccess then
+                warn("[KSPA] 主脚本执行失败: " .. tostring(loadErr))
+            end
+        else
+            warn("[KSPA] 主脚本下载失败: " .. tostring(result))
+        end
+    else
+        warn("[KSPA] 未配置 MAIN_SCRIPT_URL，请在脚本开头的 CONFIG 中设置")
+    end
+end)
+
+
+local skipConnection
+skipConnection = UserInputService.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Keyboard then
+        skipConnection:Disconnect()
+        for _, step in ipairs(steps) do
+            TweenService:Create(loadingBar, TweenInfo.new(0.1), {Size = UDim2.new(1, 0, 1, 0)}):Play()
+        end
+        statusLabel.Text = "正在跳过..."
+        task.wait(0.3)
+        screenGui:Destroy()
+        blur:Destroy()
+        print("[KSPA] 用户已跳过动画，反检测模块已部分执行。")
+        AntiDetect.RunAll()
+        
+        if CONFIG.MAIN_SCRIPT_URL and CONFIG.MAIN_SCRIPT_URL ~= "" then
+            local success, result = pcall(function()
+                return game:HttpGet(CONFIG.MAIN_SCRIPT_URL)
+            end)
+            if success then
+                pcall(function() loadstring(result)() end)
+            else
+                warn("[KSPA] 主脚本加载失败: " .. tostring(result))
+            end
+        end
+    end
+end)
