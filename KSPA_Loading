@@ -7,18 +7,26 @@ local RunService = game:GetService("RunService")
 local VirtualUser = game:GetService("VirtualUser")
 local UserInputService = game:GetService("UserInputService")
 
-
-local CONFIG = {
-    ENABLE_THREAD_IDENTITY = false, 
-    ENABLE_CONNECTION_KILL = true,    
-    ENABLE_SIMULATE_CLICK = true,     
-    ENABLE_RANDOM_DELAY = true,       
-    ENABLE_HUMAN_INPUT = true,        
-    ENABLE_REMOTE_NOISE = false,      
-    
-    MAIN_SCRIPT_URL = "https://raw.githubusercontent.com/Twbtx/Kspa/main/Fish.",
+local GAME_SCRIPTS = {
+    [167326940] = "https://raw.githubusercontent.com/Twbtx/Kspa/main/Fisch.lua",
 }
 
+local CURRENT_GAME_ID = game.PlaceId
+local MAIN_SCRIPT_URL = GAME_SCRIPTS[CURRENT_GAME_ID]
+
+if not MAIN_SCRIPT_URL then
+    warn("[KSPA] 未找到游戏ID " .. CURRENT_GAME_ID .. " 对应的脚本")
+end
+
+local CONFIG = {
+    ENABLE_THREAD_IDENTITY = false,
+    ENABLE_CONNECTION_KILL = true,
+    ENABLE_SIMULATE_CLICK = true,
+    ENABLE_RANDOM_DELAY = true,
+    ENABLE_HUMAN_INPUT = true,
+    ENABLE_REMOTE_NOISE = false,
+    MAIN_SCRIPT_URL = MAIN_SCRIPT_URL,
+}
 
 local AntiDetect = {}
 local flags = {
@@ -31,7 +39,6 @@ local flags = {
 function AntiDetect.AntiAFK()
     if flags.antiAfk then return end
     flags.antiAfk = true
-
     if CONFIG.ENABLE_CONNECTION_KILL then
         local connections = {}
         pcall(function()
@@ -43,7 +50,6 @@ function AntiDetect.AntiAFK()
             end)
         end
     end
-
     if CONFIG.ENABLE_SIMULATE_CLICK then
         pcall(function()
             LocalPlayer.Idled:Connect(function()
@@ -60,9 +66,7 @@ end
 function AntiDetect.BlockTelemetry()
     pcall(function()
         local analytics = game:GetService("AnalyticsService")
-        if analytics and analytics.ReportEvent then
-            
-        end
+        if analytics and analytics.ReportEvent then end
     end)
     print("[KSPA] 行为日志已静默")
 end
@@ -81,7 +85,6 @@ function AntiDetect.RandomizeBehavior()
 end
 
 function AntiDetect.HideScriptUI()
-    
     print("[KSPA] UI 隐藏策略已准备")
 end
 
@@ -138,7 +141,6 @@ function AntiDetect.RunAll()
     AntiDetect.MemoryProtection()
     print("[KSPA] 所有反检测模块已加载完成")
 end
-
 
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "KSPA_Intro"
@@ -269,7 +271,6 @@ discordButton.MouseButton1Click:Connect(function()
     end
 end)
 
-
 local steps = {
     {text = "KSPA 加载器 v1.0", progress = 0.1, delay = 0.3, func = nil},
     {text = "正在检查环境...", progress = 0.25, delay = 0.4, func = nil},
@@ -289,23 +290,16 @@ local steps = {
     {text = "就绪！启动中...", progress = 1.0, delay = 0.5, func = nil},
 }
 
-
 task.spawn(function()
     TweenService:Create(underline, TweenInfo.new(0.8, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(0.5, 0, 0, 3)}):Play()
-    
     for _, step in ipairs(steps) do
         statusLabel.Text = step.text
         TweenService:Create(loadingBar, TweenInfo.new(0.6, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(step.progress, 0, 1, 0)}):Play()
-        if step.func then
-            step.func()
-        end
+        if step.func then step.func() end
         task.wait(step.delay)
     end
-    
-    
     TweenService:Create(background, TweenInfo.new(1, Enum.EasingStyle.Quad), {BackgroundTransparency = 1}):Play()
     TweenService:Create(blur, TweenInfo.new(1, Enum.EasingStyle.Quad), {Size = 0}):Play()
-    
     for _, child in ipairs(screenGui:GetDescendants()) do
         if child:IsA("Frame") and child ~= background then
             TweenService:Create(child, TweenInfo.new(1, Enum.EasingStyle.Quad), {BackgroundTransparency = 1}):Play()
@@ -313,12 +307,9 @@ task.spawn(function()
             TweenService:Create(child, TweenInfo.new(1, Enum.EasingStyle.Quad), {TextTransparency = 1, BackgroundTransparency = 1}):Play()
         end
     end
-    
     task.wait(1)
     screenGui:Destroy()
     blur:Destroy()
-    
-    
     print("[KSPA] 反检测已全面激活，准备加载主脚本...")
     if CONFIG.MAIN_SCRIPT_URL and CONFIG.MAIN_SCRIPT_URL ~= "" then
         local success, result = pcall(function()
@@ -335,10 +326,9 @@ task.spawn(function()
             warn("[KSPA] 主脚本下载失败: " .. tostring(result))
         end
     else
-        warn("[KSPA] 未配置 MAIN_SCRIPT_URL，请在脚本开头的 CONFIG 中设置")
+        warn("[KSPA] 未配置 MAIN_SCRIPT_URL，请在脚本开头的 GAME_SCRIPTS 中添加当前游戏ID")
     end
 end)
-
 
 local skipConnection
 skipConnection = UserInputService.InputBegan:Connect(function(input)
@@ -353,7 +343,6 @@ skipConnection = UserInputService.InputBegan:Connect(function(input)
         blur:Destroy()
         print("[KSPA] 用户已跳过动画，反检测模块已部分执行。")
         AntiDetect.RunAll()
-        
         if CONFIG.MAIN_SCRIPT_URL and CONFIG.MAIN_SCRIPT_URL ~= "" then
             local success, result = pcall(function()
                 return game:HttpGet(CONFIG.MAIN_SCRIPT_URL)
