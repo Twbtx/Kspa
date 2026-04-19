@@ -8,7 +8,8 @@ local VirtualUser = game:GetService("VirtualUser")
 local UserInputService = game:GetService("UserInputService")
 
 local GAME_SCRIPTS = {
-    [167326940] = "https://raw.githubusercontent.com/Twbtx/Kspa/main/Fisch.lua",
+    [167326940] = "https://raw.githubusercontent.com/Twbtx/Kspa/main/Fisch.lua",--鱼 Fisch
+    [6961824067] = "https://raw.githubusercontent.com/Twbtx/tiamxiabuwu/main/Fling",--Fling Things and people
 }
 
 local CURRENT_GAME_ID = game.PlaceId
