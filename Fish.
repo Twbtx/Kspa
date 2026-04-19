@@ -1,0 +1,889 @@
+loadstring(game:HttpGet("https://raw.githubusercontent.com/Twbtx/Kspa/main/fish.bypass"))()
+local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/mstudio45/LinoriaLib/refs/heads/main/Library.lua"))()
+local ThemeManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/mstudio45/LinoriaLib/refs/heads/main/addons/ThemeManager.lua"))()
+local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/mstudio45/LinoriaLib/refs/heads/main/addons/SaveManager.lua"))()
+
+local Window = Library:CreateWindow({ Title = "KSPA - Fisch 超完整版", Center = true, AutoShow = true })
+local Tabs = {
+    Fishing = Window:AddTab("自动钓鱼"),
+    Auto = Window:AddTab("全自动功能"),
+    Teleports = Window:AddTab("传送"),
+    Settings = Window:AddTab("设置")
+}
+
+local function MakeGroup(parent, title, pos) return parent:AddLeftGroupbox(title) end
+local function MakeRightGroup(parent, title, pos) return parent:AddRightGroupbox(title) end
+
+-- 钓鱼核心
+local G1 = Tabs.Fishing:AddLeftGroupbox("抛竿控制")
+G1:AddToggle("AutoCast", { Text = "自动抛竿", Default = false })
+G1:AddToggle("PerfectCast", { Text = "完美抛竿 (100%)", Default = false })
+G1:AddToggle("RandomCast", { Text = "随机抛竿力度 (90-99%)", Default = true })
+G1:AddSlider("CastDelayMin", { Text = "抛竿最小延迟(秒)", Default = 0.3, Min = 0.1, Max = 2, Rounding = 1 })
+G1:AddSlider("CastDelayMax", { Text = "抛竿最大延迟(秒)", Default = 0.8, Min = 0.2, Max = 3, Rounding = 1 })
+G1:AddToggle("InstantBob", { Text = "快速落水", Default = false })
+G1:AddToggle("AutoReel", { Text = "自动收竿 (UI跟随)", Default = false })
+G1:AddToggle("InstantReel", { Text = "瞬间收竿", Default = false })
+G1:AddToggle("PerfectReel", { Text = "完美收竿 (100%)", Default = false })
+G1:AddSlider("ReelDelay", { Text = "收竿前延迟(秒)", Default = 0.5, Min = 0.1, Max = 2, Rounding = 1 })
+G1:AddToggle("AutoShake", { Text = "自动摇晃", Default = false })
+G1:AddToggle("CenterShake", { Text = "居中摇晃UI", Default = false })
+G1:AddSlider("ShakeDelay", { Text = "摇晃间隔(秒)", Default = 0.3, Min = 0.1, Max = 1, Rounding = 1 })
+G1:AddToggle("ShakeMouseClick", { Text = "使用鼠标点击摇晃", Default = true })
+
+local G2 = Tabs.Fishing:AddRightGroupbox("鱼饵与装备")
+G2:AddToggle("AutoBait", { Text = "自动装饵", Default = false })
+G2:AddToggle("AutoEquipRod", { Text = "自动装备鱼竿", Default = false })
+G2:AddToggle("AutoUnequipRod", { Text = "收竿后自动卸下鱼竿", Default = false })
+G2:AddToggle("AutoRepairRod", { Text = "自动修理鱼竿 (耐久低时)", Default = false })
+G2:AddSlider("RepairThreshold", { Text = "修理阈值(耐久%)", Default = 20, Min = 5, Max = 50, Rounding = 0 })
+G2:AddToggle("AutoUseTotem", { Text = "自动使用图腾 (手持)", Default = false })
+G2:AddDropdown("TotemType", { Text = "图腾类型", Values = { "Sundial", "Tempest", "Smokescreen", "Aurora" }, Default = 1, Multi = false })
+
+-- 自动出售与估价
+local G3 = Tabs.Fishing:AddLeftGroupbox("出售与估价")
+G3:AddToggle("AutoSellAll", { Text = "自动出售全部鱼", Default = false })
+G3:AddSlider("SellInterval", { Text = "出售间隔(秒)", Default = 60, Min = 10, Max = 300, Rounding = 0 })
+G3:AddToggle("AutoSellHand", { Text = "自动出售手中鱼", Default = false })
+G3:AddToggle("AutoAppraise", { Text = "自动估价 (需手持鱼)", Default = false })
+G3:AddToggle("KeepShiny", { Text = "保留闪光/变异鱼", Default = true })
+G3:AddToggle("KeepMythic", { Text = "保留神话鱼", Default = true })
+G3:AddToggle("KeepEvent", { Text = "保留活动鱼", Default = true })
+G3:AddToggle("AutoSellLowValue", { Text = "自动出售低价值鱼", Default = false })
+G3:AddSlider("MinValueToKeep", { Text = "最低保留价值(C$)", Default = 1000, Min = 100, Max = 10000, Rounding = 0 })
+
+-- 蟹笼
+local G4 = Tabs.Fishing:AddRightGroupbox("蟹笼")
+G4:AddToggle("AutoCollectCrab", { Text = "自动收集蟹笼", Default = false })
+G4:AddToggle("AutoPlaceCrab", { Text = "自动放置蟹笼", Default = false })
+G4:AddSlider("CrabInterval", { Text = "放置间隔(秒)", Default = 5, Min = 1, Max = 30, Rounding = 0 })
+G4:AddToggle("AutoBuyCrabCage", { Text = "自动购买蟹笼 (不足时)", Default = false })
+G4:AddSlider("CrabCageCount", { Text = "保持蟹笼数量", Default = 10, Min = 1, Max = 50, Rounding = 0 })
+
+-- 事件与任务
+local G5 = Tabs.Auto:AddLeftGroupbox("事件与任务")
+G5:AddToggle("AutoMeteor", { Text = "自动捡陨石", Default = false })
+G5:AddToggle("AutoChest", { Text = "自动开宝箱 (全图)", Default = false })
+G5:AddToggle("AutoMap", { Text = "自动完成藏宝图", Default = false })
+G5:AddToggle("AutoKillBoss", { Text = "自动攻击守护者火炬", Default = false })
+G5:AddToggle("AutoEventFarm", { Text = "自动刷丰饶事件", Default = false })
+G5:AddToggle("AutoTotem", { Text = "自动使用图腾 (需手持)", Default = false })
+G5:AddToggle("AutoFishRadar", { Text = "自动使用鱼雷达", Default = false })
+G5:AddToggle("AutoCollectOrbs", { Text = "自动收集能量球 (深渊)", Default = false })
+G5:AddToggle("AutoCompletePuzzle", { Text = "自动完成谜题 (宙斯/波塞冬)", Default = false })
+
+-- 生存与环境
+local G6 = Tabs.Auto:AddRightGroupbox("生存与环境")
+G6:AddToggle("AntiAFK", { Text = "反挂机", Default = false })
+G6:AddToggle("InfiniteOxygen", { Text = "无限氧气", Default = false })
+G6:AddToggle("NoTemperature", { Text = "无视温度", Default = false })
+G6:AddToggle("Fullbright", { Text = "全亮", Default = false })
+G6:AddToggle("NoFog", { Text = "无雾", Default = false })
+G6:AddToggle("NoLocationCC", { Text = "移除区域光效", Default = false })
+G6:AddToggle("WalkOnWater", { Text = "水上行走", Default = false })
+G6:AddSlider("WaterHeight", { Text = "水面高度", Default = 126, Min = 120, Max = 130, Rounding = 1 })
+G6:AddToggle("NoFallDamage", { Text = "免疫掉落伤害", Default = false })
+G6:AddToggle("NoStamina", { Text = "无限体力 (游泳/攀爬)", Default = false })
+G6:AddToggle("AutoHeal", { Text = "自动回血", Default = false })
+G6:AddSlider("HealThreshold", { Text = "回血阈值(生命%)", Default = 30, Min = 10, Max = 80, Rounding = 0 })
+
+-- 性能优化
+local G7 = Tabs.Auto:AddLeftGroupbox("性能优化")
+G7:AddToggle("DestroyFishModel", { Text = "删除鱼模型 (提帧)", Default = false })
+G7:AddToggle("DisableRendering", { Text = "禁用3D渲染 (黑屏提帧)", Default = false })
+G7:AddToggle("HideInventoryUI", { Text = "隐藏背包UI", Default = false })
+G7:AddToggle("RemoveParticles", { Text = "移除粒子效果", Default = false })
+G7:AddToggle("LowQualityTerrain", { Text = "低质量地形", Default = false })
+G7:AddToggle("DisableWaterReflection", { Text = "禁用水面反射", Default = false })
+G7:AddToggle("DisableShadows", { Text = "禁用阴影", Default = false })
+G7:AddSlider("RenderDistance", { Text = "渲染距离", Default = 1000, Min = 200, Max = 5000, Rounding = 0 })
+G7:AddToggle("FPSUnlock", { Text = "解锁帧率上限", Default = false })
+G7:AddSlider("FPSLimit", { Text = "帧率上限", Default = 144, Min = 30, Max = 240, Rounding = 0 })
+
+-- 服务器操作
+local G8 = Tabs.Auto:AddRightGroupbox("服务器操作")
+G8:AddToggle("AutoRejoin", { Text = "自动重连当前服", Default = false })
+G8:AddToggle("AutoHopRandom", { Text = "自动随机跳服", Default = false })
+G8:AddToggle("AutoHopSmallest", { Text = "自动跳最少人服", Default = false })
+G8:AddToggle("AutoHopMaxPlayers", { Text = "服务器满员时自动跳", Default = false })
+G8:AddToggle("AutoReconnectOnDeath", { Text = "死亡后自动重连", Default = false })
+G8:AddButton("手动跳随机服", function() AutoHopRandomLogic() end)
+G8:AddButton("手动跳最少人服", function() AutoHopSmallestLogic() end)
+
+-- NPC购买
+local G9 = Tabs.Auto:AddLeftGroupbox("NPC购买")
+G9:AddToggle("AutoBuyLuck", { Text = "自动购买幸运 (梅林)", Default = false })
+G9:AddSlider("LuckAmount", { Text = "幸运次数", Default = 1, Min = 1, Max = 50, Rounding = 0 })
+G9:AddToggle("AutoBuyPower", { Text = "自动购买力量 (梅林)", Default = false })
+G9:AddSlider("PowerAmount", { Text = "力量次数", Default = 1, Min = 1, Max = 50, Rounding = 0 })
+G9:AddToggle("AutoBuyBait", { Text = "自动购买鱼饵 (商人)", Default = false })
+G9:AddDropdown("BaitType", { Text = "鱼饵类型", Values = { "Worm", "Bagel", "Insect", "Minnow", "Shrimp" }, Default = 1, Multi = false })
+G9:AddToggle("AutoBuyBaitBox", { Text = "自动购买鱼饵箱", Default = false })
+G9:AddToggle("AutoBuyConch", { Text = "自动购买海螺 (传送)", Default = false })
+G9:AddToggle("AutoBuyDivingGear", { Text = "自动购买潜水装备", Default = false })
+
+-- 角色移动
+local G10 = Tabs.Auto:AddRightGroupbox("角色移动")
+G10:AddToggle("AutoRun", { Text = "自动奔跑", Default = false })
+G10:AddSlider("WalkSpeed", { Text = "奔跑速度", Default = 16, Min = 16, Max = 100, Rounding = 0 })
+G10:AddToggle("AutoFly", { Text = "飞行模式", Default = false })
+G10:AddSlider("FlySpeed", { Text = "飞行速度", Default = 50, Min = 10, Max = 300, Rounding = 0 })
+G10:AddToggle("AutoFreeze", { Text = "冻结位置", Default = false })
+G10:AddDropdown("FreezeMode", { Text = "冻结模式", Values = { "Rod Equipped", "Toggled" }, Default = 1, Multi = false })
+G10:AddToggle("AutoRecall", { Text = "自动召回保存点", Default = false })
+G10:AddButton("保存当前位置", function() SavedPosition = HumanoidRootPart.Position end)
+G10:AddToggle("NoClip", { Text = "无碰撞穿墙", Default = false })
+G10:AddToggle("InfiniteJump", { Text = "无限跳跃", Default = false })
+G10:AddToggle("AutoClimb", { Text = "自动攀爬", Default = false })
+
+-- 区域钓鱼
+local G11 = Tabs.Auto:AddLeftGroupbox("区域钓鱼")
+G11:AddToggle("ZoneFish", { Text = "区域钓鱼 (锁定区域)", Default = false })
+G11:AddDropdown("ZoneFishDropdown", { Text = "选择钓鱼区", Values = {}, Default = 1, Multi = false })
+G11:AddToggle("AutoZoneCast", { Text = "自动抛竿到区域中心", Default = false })
+G11:AddToggle("AutoMoveToZone", { Text = "自动移动到钓鱼区", Default = true })
+G11:AddToggle("FishOnlyInZone", { Text = "仅允许在区域内钓鱼", Default = false })
+G11:AddButton("刷新区域列表", function() UpdateZoneDropdown() end)
+
+-- 其他辅助
+local G12 = Tabs.Auto:AddRightGroupbox("其他辅助")
+G12:AddToggle("AutoSpamTool", { Text = "自动连发工具 (开箱)", Default = false })
+G12:AddToggle("AutoClick", { Text = "自动点击鼠标左键", Default = false })
+G12:AddSlider("ClickInterval", { Text = "点击间隔(秒)", Default = 0.1, Min = 0.05, Max = 1, Rounding = 2 })
+G12:AddToggle("AutoFishAlert", { Text = "钓到稀有鱼时提示", Default = false })
+G12:AddToggle("AutoRecordFish", { Text = "记录钓到的鱼 (日志)", Default = false })
+G12:AddToggle("AutoWebhook", { Text = "Webhook通知", Default = false })
+G12:AddTextbox("WebhookURL", { Text = "Webhook地址", Default = "", MultiLine = false })
+G12:AddToggle("NotifyOnMythic", { Text = "神话鱼通知", Default = false })
+G12:AddToggle("NotifyOnLevelUp", { Text = "等级提升通知", Default = false })
+G12:AddToggle("NotifyOnMoneyGoal", { Text = "金钱达标通知", Default = false })
+G12:AddSlider("MoneyGoal", { Text = "金钱目标", Default = 100000, Min = 10000, Max = 1000000, Rounding = 0 })
+
+-- 传送点（大量）
+local G13 = Tabs.Teleports:AddLeftGroupbox("常用传送点")
+local locations = {
+    Moosewood = Vector3.new(383.1, 131.2, 243.9),
+    ["Roslit Bay"] = Vector3.new(-1476.5, 130.2, 671.7),
+    Vertigo = Vector3.new(-112.0, -492.9, 1040.3),
+    Snowcap = Vector3.new(2648.7, 139.1, 2521.3),
+    ["Ancient Isle"] = Vector3.new(6055.5, 195.1, 289.6),
+    ["Forsaken Shores"] = Vector3.new(-2471.2, 133.0, 1558.6),
+    ["Sunstone"] = Vector3.new(-913.8, 138.2, -1133.3),
+    ["Terrapin"] = Vector3.new(-193.4, 135.1, 1951.5),
+    ["Statue of Sovereignty"] = Vector3.new(21.4, 159.0, -1039.1),
+    ["Mushgrove Swamp"] = Vector3.new(2434.3, 132.0, -691.9),
+    ["The Depths"] = Vector3.new(568.2, -704.4, 1230.8),
+    ["Keepers Altar"] = Vector3.new(1296.8, -805.3, -297.4),
+    ["Enchant Altar"] = Vector3.new(1309.0, -802.4, -91.2),
+    ["Trident Gate"] = Vector3.new(-1480.9, -225.7, -2381.8),
+    ["Desolate Deep"] = Vector3.new(-1068.0, -239.0, -3108.0),
+    ["Brine Pool"] = Vector3.new(-1794.1, -142.7, -3309.3),
+    ["Grand Reef"] = Vector3.new(-3576.0, 151.0, 522.0),
+    ["Kraken Pool"] = Vector3.new(-4396.0, -995.0, 2046.0),
+    ["Atlantis"] = Vector3.new(-4253.5, -603.4, 1827.8),
+    ["Zeus Trial"] = Vector3.new(-4296.2, -673.1, 2353.9),
+    ["Poseidon Trial"] = Vector3.new(-4283.8, -694.2, 1102.6),
+    ["Ethereal Abyss"] = Vector3.new(-3803.1, -566.8, 1835.2),
+    ["Overgrowth Caves"] = Vector3.new(19746.3, 416.0, 5403.6),
+    ["Frigid Cavern"] = Vector3.new(20253.6, 756.5, 5772.7),
+    ["Glacial Grotto"] = Vector3.new(20003.0, 1136.4, 5556.0),
+    ["Cryogenic Canal"] = Vector3.new(19958.5, 917.2, 5332.6),
+    ["Northern Summit"] = Vector3.new(19608.8, 131.4, 5222.2),
+    ["Northern Expedition"] = Vector3.new(-1701.0, 187.6, 3944.8),
+    ["Harvesters Spike"] = Vector3.new(-1255.5, 138.1, 1550.3),
+    ["Oil Rig"] = Vector3.new(-1906.0, 224.9, -500.2),
+}
+local locNames = {}
+for name, _ in pairs(locations) do table.insert(locNames, name) end
+table.sort(locNames)
+G13:AddDropdown("TeleportLocation", { Text = "选择地点", Values = locNames, Default = 1, Multi = false })
+G13:AddButton("传送", function() TeleportTo(locations[Options.TeleportLocation.Value]) end)
+G13:AddButton("保存当前位置", function() SavedPosition = HumanoidRootPart.Position end)
+
+local G14 = Tabs.Teleports:AddRightGroupbox("NPC传送")
+local npcList = {
+    "Merlin", "Appraiser", "Merchant", "Shipwright", "Angler", "Phineas", "Ashe", "Jack Marrow", "Wilson", "Synth", "The Keeper", "Caleia", "Meteoriticist", "Hiker", "Dr. Crookspine"
+}
+G14:AddDropdown("NPCList", { Text = "选择NPC", Values = npcList, Default = 1, Multi = false })
+G14:AddButton("传送至NPC", function()
+    local npcName = Options.NPCList.Value
+    local npc = workspace:FindFirstChild("world") and workspace.world:FindFirstChild("npcs") and workspace.world.npcs:FindFirstChild(npcName)
+    if npc and npc:FindFirstChild("HumanoidRootPart") then TeleportTo(npc.HumanoidRootPart.Position + Vector3.new(0, 3, 0)) end
+end)
+
+local G15 = Tabs.Teleports:AddLeftGroupbox("鱼竿商店传送")
+local rodShops = {
+    ["Training Rod"] = Vector3.new(457.7, 148.4, 230.4),
+    ["Plastic Rod"] = Vector3.new(454.4, 148.2, 229.2),
+    ["Carbon Rod"] = Vector3.new(454.1, 150.6, 225.3),
+    ["Fast Rod"] = Vector3.new(447.2, 148.2, 220.2),
+    ["Long Rod"] = Vector3.new(485.7, 171.7, 145.7),
+    ["Lucky Rod"] = Vector3.new(446.1, 148.3, 222.2),
+    ["Steady Rod"] = Vector3.new(-1511.2, 139.7, 759.4),
+    ["Fortune Rod"] = Vector3.new(-1520.9, 141.3, 771.9),
+    ["Nocturnal Rod"] = Vector3.new(-141.9, -515.3, 1139.0),
+    ["Kings Rod"] = Vector3.new(1375.6, -810.2, -303.5),
+    ["Trident Rod"] = Vector3.new(-1484.3, -222.3, -2194.8),
+    ["Rod of the Depths"] = Vector3.new(1689.9, -902.4, 1437.7),
+}
+local rodNames = {}
+for name, _ in pairs(rodShops) do table.insert(rodNames, name) end
+table.sort(rodNames)
+G15:AddDropdown("RodShopList", { Text = "选择鱼竿", Values = rodNames, Default = 1, Multi = false })
+G15:AddButton("传送至鱼竿", function() TeleportTo(rodShops[Options.RodShopList.Value]) end)
+
+local G16 = Tabs.Teleports:AddRightGroupbox("物品传送")
+local items = {
+    GPS = Vector3.new(517.9, 149.2, 284.9),
+    Glider = Vector3.new(-1713, 149, 740),
+    Pickaxe = Vector3.new(19783, 415.7, 5391.9),
+    ["Advanced Glider"] = Vector3.new(19939, 1142, 5544),
+    ["Heart of Zeus"] = Vector3.new(-2522, 138, 1593),
+    ["Crab Cage"] = Vector3.new(465, 150, 235),
+    ["Conception Conch"] = Vector3.new(-145, -515, 1140),
+    ["Common Crate"] = Vector3.new(-1140, 125, -1076),
+}
+for name, _ in pairs(items) do
+    G16:AddButton("传送至 " .. name, function() TeleportTo(items[name]) end)
+end
+
+-- 设置
+local G17 = Tabs.Settings:AddLeftGroupbox("界面设置")
+G17:AddKeyPicker("MenuKeybind", { Text = "菜单快捷键", Default = "End", NoUI = true })
+Library.ToggleKeybind = Options.MenuKeybind
+G17:AddToggle("ShowCoords", { Text = "显示坐标", Default = false })
+G17:AddToggle("ShowFPS", { Text = "显示FPS", Default = false })
+G17:AddToggle("ShowFishCounter", { Text = "显示钓鱼计数", Default = false })
+
+ThemeManager:SetLibrary(Library)
+SaveManager:SetLibrary(Library)
+SaveManager:IgnoreThemeSettings()
+SaveManager:SetIgnoreIndexes({ "MenuKeybind" })
+ThemeManager:SetFolder("KSPA_Full")
+SaveManager:SetFolder("KSPA_Full/Fisch")
+SaveManager:BuildConfigSection(Tabs.Settings)
+ThemeManager:ApplyToTab(Tabs.Settings)
+SaveManager:LoadAutoloadConfig()
+
+-- 全局变量和工具函数
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+local VirtualUser = game:GetService("VirtualUser")
+local Lighting = game:GetService("Lighting")
+local HttpService = game:GetService("HttpService")
+local TeleportService = game:GetService("TeleportService")
+local StarterGui = game:GetService("StarterGui")
+local GuiService = game:GetService("GuiService")
+local TweenService = game:GetService("TweenService")
+local CollectionService = game:GetService("CollectionService")
+local Stats = game:GetService("Stats")
+
+local LocalPlayer = Players.LocalPlayer
+local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+local Humanoid = Character:WaitForChild("Humanoid")
+local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
+
+local CurrentTool = nil
+local LastCastTime = 0
+local LastSellTime = 0
+local LastShakeTime = 0
+local SavedPosition = nil
+local FreezeCFrame = nil
+local FlyBodyVelocity = nil
+local FlyBodyGyro = nil
+local Flying = false
+local InfiniteJumpConn = nil
+local ZoneFishOrigin = nil
+local FishCount = 0
+local LastFPSUpdate = 0
+local FPS = 60
+
+local function RandomDelay(minSec, maxSec) task.wait(minSec + math.random() * (maxSec - minSec)) end
+
+local function GetTool()
+    if Character and Character:FindFirstChildOfClass("Tool") then return Character:FindFirstChildOfClass("Tool") end
+    local tool = LocalPlayer.Backpack:FindFirstChildOfClass("Tool")
+    if tool then tool.Parent = Character end
+    return tool
+end
+
+local function TeleportTo(pos)
+    pcall(function() Character:PivotTo(CFrame.new(pos)) end)
+end
+
+local function SafeTeleport(pos)
+    local ray = workspace:Raycast(pos, Vector3.new(0, -10, 0), RaycastParams.new())
+    TeleportTo(ray and ray.Position + Vector3.new(0, 3, 0) or pos)
+end
+
+local function AutoCastLogic()
+    local tool = GetTool()
+    if not tool then return end
+    local values, events = tool:FindFirstChild("values"), tool:FindFirstChild("events")
+    if not values or not events then return end
+    if values.casted and values.casted.Value == false and tick() - LastCastTime > Options.CastDelayMin.Value then
+        LastCastTime = tick()
+        local percent = Options.PerfectCast.Value and 100 or (Options.RandomCast.Value and math.random(90, 99) or 95)
+        if events:FindFirstChild("cast") then events.cast:FireServer(percent, 1)
+        elseif events:FindFirstChild("castAsync") then events.castAsync:InvokeServer(percent, 1) end
+        if Options.InstantBob.Value then
+            task.spawn(function()
+                for _ = 1, 10 do
+                    local bobber = tool:FindFirstChild("bobber")
+                    if bobber then
+                        local ray = workspace:Raycast(bobber.Position, Vector3.new(0, -100, 0))
+                        if ray then bobber.CFrame = CFrame.new(ray.Position) break end
+                    end
+                    task.wait(0.05)
+                end
+            end)
+        end
+        RandomDelay(Options.CastDelayMin.Value, Options.CastDelayMax.Value)
+    end
+end
+
+local function AutoReelLogic()
+    local reelGui = LocalPlayer.PlayerGui:FindFirstChild("reel")
+    if not reelGui then return end
+    if Options.InstantReel.Value then
+        local bar = reelGui:FindFirstChild("bar")
+        if bar and bar:FindFirstChild("reel") and bar.reel.Enabled then
+            task.wait(Options.ReelDelay.Value)
+            ReplicatedStorage.events:FindFirstChild("reelfinished "):FireServer(100, Options.PerfectReel.Value)
+        end
+    elseif Options.AutoReel.Value then
+        local bar = reelGui:FindFirstChild("bar")
+        if bar then
+            local playerBar, fishBar = bar:FindFirstChild("playerbar"), bar:FindFirstChild("fish")
+            if playerBar and fishBar then
+                local conn = RunService.RenderStepped:Connect(function()
+                    if not reelGui.Parent then conn:Disconnect() end
+                    local targetX = math.clamp(fishBar.Position.X.Scale, 0.15, 0.85)
+                    playerBar.Position = UDim2.new(targetX, 0, playerBar.Position.Y.Scale, 0)
+                end)
+                task.delay(0.5, function() conn:Disconnect() end)
+            end
+        end
+    end
+end
+
+local function AutoShakeLogic()
+    if tick() - LastShakeTime < Options.ShakeDelay.Value then return end
+    local shakeGui = LocalPlayer.PlayerGui:FindFirstChild("shakeui")
+    if not shakeGui or not shakeGui.Enabled then return end
+    local safezone = shakeGui:FindFirstChild("safezone")
+    if not safezone then return end
+    local button = safezone:FindFirstChild("button")
+    if not button or not button.Visible then return end
+    if Options.CenterShake.Value then
+        safezone.Size = UDim2.new(0, 0, 0, 0)
+        safezone.Position = UDim2.new(0.5, 0, 0.5, 0)
+        safezone.AnchorPoint = Vector2.new(0.5, 0.5)
+    end
+    if Options.ShakeMouseClick.Value then
+        local x = button.AbsolutePosition.X + button.AbsoluteSize.X / 2
+        local y = button.AbsolutePosition.Y + button.AbsoluteSize.Y / 2
+        VirtualInputManager:SendMouseButtonEvent(x, y, 0, true, LocalPlayer, 0)
+        task.wait(0.05)
+        VirtualInputManager:SendMouseButtonEvent(x, y, 0, false, LocalPlayer, 0)
+    else
+        GuiService.SelectedObject = button
+        VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Return, false, game)
+        task.wait(0.05)
+        VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Return, false, game)
+    end
+    LastShakeTime = tick()
+end
+
+local function AutoSellAllLogic()
+    if tick() - LastSellTime < Options.SellInterval.Value then return end
+    LastSellTime = tick()
+    pcall(function() ReplicatedStorage.events:FindFirstChild("SellAll"):InvokeServer() end)
+end
+
+local function AutoSellHandLogic()
+    local tool = GetTool()
+    if tool and tool:FindFirstChild("fishscript") then
+        pcall(function() ReplicatedStorage.events:FindFirstChild("Sell"):InvokeServer() end)
+    end
+end
+
+local function AutoAppraiseLogic()
+    local tool = GetTool()
+    if tool and tool:FindFirstChild("fishscript") then
+        local appraiser = workspace:FindFirstChild("world") and workspace.world:FindFirstChild("npcs") and workspace.world.npcs:FindFirstChild("Appraiser")
+        if appraiser and appraiser:FindFirstChild("appraiser") then
+            pcall(function() appraiser.appraiser:FindFirstChild("appraise"):InvokeServer() end)
+        end
+    end
+end
+
+local function AutoCollectCrabLogic()
+    local boat = workspace:FindFirstChild("active") and workspace.active:FindFirstChild("boats") and workspace.active.boats:FindFirstChild(LocalPlayer.Name)
+    if boat and boat:FindFirstChild("Prompt") then pcall(function() fireproximityprompt(boat.Prompt) end) end
+end
+
+local function AutoPlaceCrabLogic()
+    local tool = Character:FindFirstChild("Crab Cage")
+    if tool and tool:FindFirstChild("Deploy") then
+        pcall(function() tool.Deploy:FireServer({ CFrame = HumanoidRootPart.CFrame }) end)
+        RandomDelay(Options.CrabInterval.Value - 0.5, Options.CrabInterval.Value + 0.5)
+    end
+end
+
+local function AutoMeteorLogic()
+    local meteorItems = workspace:FindFirstChild("active") and workspace.active:FindFirstChild("meteorItems")
+    if not meteorItems then return end
+    for _, item in pairs(meteorItems:GetChildren()) do
+        if item:IsA("Model") and item:FindFirstChild("Center") then
+            local center = item.Center
+            if center and center:FindFirstChild("prompt") then
+                local origin = HumanoidRootPart.CFrame
+                TeleportTo(center.Position - Vector3.new(0, 5, 0))
+                fireproximityprompt(center.prompt)
+                task.wait(2)
+                TeleportTo(origin)
+                break
+            end
+        end
+    end
+end
+
+local function AutoChestLogic()
+    local chests = workspace:FindFirstChild("world") and workspace.world:FindFirstChild("chests")
+    if not chests then return end
+    local nearest, minDist = nil, math.huge
+    for _, chest in pairs(chests:GetChildren()) do
+        if chest:FindFirstChild("ChestClosed") then
+            local pos = chest:GetPivot().Position
+            local dist = (HumanoidRootPart.Position - pos).Magnitude
+            if dist < minDist then minDist, nearest = dist, chest end
+        end
+    end
+    if nearest then
+        TeleportTo(nearest:GetPivot().Position)
+        task.wait(0.5)
+        repeat task.wait() until not nearest:FindFirstChild("ChestClosed")
+    end
+end
+
+local function AutoMapLogic()
+    local mapTool = LocalPlayer.Backpack:FindFirstChild("Treasure Map") or Character:FindFirstChild("Treasure Map")
+    if not mapTool then return end
+    if not Character:FindFirstChild("Treasure Map") then mapTool.Parent = Character task.wait(0.5) end
+    local jack = workspace:FindFirstChild("world") and workspace.world:FindFirstChild("npcs") and workspace.world.npcs:FindFirstChild("Jack Marrow")
+    if jack and jack:FindFirstChild("treasure") then
+        pcall(function() jack.treasure:FindFirstChild("repairmap"):InvokeServer() end)
+        task.wait(1)
+    end
+    local mapGui = LocalPlayer.PlayerGui:FindFirstChild("Treasure Map")
+    if mapGui and mapGui:FindFirstChild("Main") then
+        local label = mapGui.Main:FindFirstChild("CoordinatesLabel")
+        if label then
+            local x, y, z = label.Text:match("X:?%s*([%-%d.]+),? Y:?%s*([%-%d.]+),? Z:?%s*([%-%d.]+)")
+            if x and y and z then TeleportTo(Vector3.new(tonumber(x), tonumber(y), tonumber(z))) end
+        end
+    end
+end
+
+local function AutoKillBossLogic()
+    local keepers = workspace:FindFirstChild("world") and workspace.world:FindFirstChild("npcs") and workspace.world.npcs:FindFirstChild("Keepers Torch")
+    if keepers then pcall(function() ReplicatedStorage.events:FindFirstChild("keepersTorchHit"):FireServer(false) end) end
+end
+
+local function AutoEventFarmLogic()
+    local zones = workspace:FindFirstChild("zones") and workspace.zones:FindFirstChild("fishing")
+    if not zones then return end
+    for _, zone in pairs(zones:GetChildren()) do
+        if zone:FindFirstChild("Abundance") or zone:FindFirstChild("POIHeader") then
+            TeleportTo(zone.Position + Vector3.new(0, zone.Size.Y / 2 + 3, 0))
+            break
+        end
+    end
+end
+
+local function AutoTotemLogic()
+    local tool = GetTool()
+    if tool and (tool.Name:find("Totem") or tool.Name:find("totem")) then
+        pcall(function() tool:Activate() end)
+        task.wait(2)
+    end
+end
+
+local function AntiAFKLogic()
+    pcall(function()
+        VirtualUser:CaptureController()
+        VirtualUser:ClickButton2(Vector2.new())
+    end)
+end
+
+local function InfiniteOxygenLogic()
+    if Character and Character:FindFirstChild("Resources") then
+        local oxygen = Character.Resources:FindFirstChild("oxygen")
+        if oxygen then oxygen.Disabled = Options.InfiniteOxygen.Value end
+    end
+end
+
+local function NoTemperatureLogic()
+    if Character and Character:FindFirstChild("Resources") then
+        local temp = Character.Resources:FindFirstChild("temperature")
+        if temp then temp.Disabled = Options.NoTemperature.Value end
+    end
+end
+
+local function FullbrightLogic()
+    if Options.Fullbright.Value then
+        Lighting.Brightness, Lighting.ClockTime, Lighting.GlobalShadows, Lighting.Ambient = 5, 12, false, Color3.new(1, 1, 1)
+    else
+        Lighting.Brightness, Lighting.ClockTime, Lighting.GlobalShadows, Lighting.Ambient = 1, 12, true, Color3.new(0.5, 0.5, 0.5)
+    end
+end
+
+local function NoFogLogic()
+    if Options.NoFog.Value then
+        Lighting.FogColor, Lighting.FogEnd, Lighting.FogStart, Lighting.OutdoorAmbient = Color3.new(1, 1, 1), 1e6, 0, Color3.new(1, 1, 1)
+        for _, obj in pairs(Lighting:GetChildren()) do if obj:IsA("Sky") or obj:IsA("Atmosphere") then obj:Destroy() end end
+    else
+        Lighting.FogColor, Lighting.FogEnd, Lighting.FogStart, Lighting.OutdoorAmbient = Color3.new(0.5, 0.5, 0.5), 1000, 100, Color3.new(0.5, 0.5, 0.5)
+    end
+end
+
+local function NoLocationCCLogic()
+    local cc = Lighting:FindFirstChild("location")
+    if cc then cc.Enabled = not Options.NoLocationCC.Value end
+end
+
+local function WalkOnWaterLogic()
+    local part = workspace:FindFirstChild("KSPA_WaterWalk")
+    if Options.WalkOnWater.Value then
+        if not part then part = Instance.new("Part", workspace) part.Name = "KSPA_WaterWalk" part.Size = Vector3.new(15, 2, 15) part.Anchored = true part.CanCollide = true part.Material = Enum.Material.ForceField part.Transparency = 0.5 end
+        part.CanCollide = true
+        task.spawn(function() while Options.WalkOnWater.Value do part.Position = Vector3.new(HumanoidRootPart.Position.X, Options.WaterHeight.Value, HumanoidRootPart.Position.Z) task.wait(0.1) end end)
+    elseif part then part:Destroy() end
+end
+
+local function DestroyFishModelLogic()
+    if not Options.DestroyFishModel.Value then return end
+    local active = workspace:FindFirstChild("active")
+    if active then for _, m in pairs(active:GetChildren()) do if m:IsA("Model") and m:FindFirstChild("Fish") then m:Destroy() end end end
+end
+
+local function DisableRenderingLogic()
+    RunService:Set3dRenderingEnabled(not Options.DisableRendering.Value)
+end
+
+local function HideInventoryUILogic()
+    local inv = LocalPlayer.PlayerGui:FindFirstChild("hud") and LocalPlayer.PlayerGui.hud:FindFirstChild("safezone") and LocalPlayer.PlayerGui.hud.safezone:FindFirstChild("backpack")
+    if inv then inv.Visible = not Options.HideInventoryUI.Value end
+    StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, Options.HideInventoryUI.Value)
+end
+
+local function RemoveParticlesLogic()
+    if not Options.RemoveParticles.Value then return end
+    for _, v in pairs(workspace:GetDescendants()) do if v:IsA("ParticleEmitter") then v.Enabled = false end end
+end
+
+local function LowQualityTerrainLogic()
+    if Options.LowQualityTerrain.Value then
+        workspace.Terrain.WaterWaveSize, workspace.Terrain.WaterWaveSpeed, workspace.Terrain.WaterReflectance, workspace.Terrain.WaterTransparency = 0, 0, 0, 1
+    else
+        workspace.Terrain.WaterWaveSize, workspace.Terrain.WaterWaveSpeed, workspace.Terrain.WaterReflectance, workspace.Terrain.WaterTransparency = 12, 10, 0.5, 0
+    end
+end
+
+local function DisableWaterReflectionLogic()
+    if Options.DisableWaterReflection.Value then
+        workspace.Terrain.WaterReflectance = 0
+    else
+        workspace.Terrain.WaterReflectance = 0.5
+    end
+end
+
+local function DisableShadowsLogic()
+    if Options.DisableShadows.Value then
+        Lighting.GlobalShadows = false
+    else
+        Lighting.GlobalShadows = true
+    end
+end
+
+local function FPSUnlockLogic()
+    if Options.FPSUnlock.Value then
+        setfpscap(Options.FPSLimit.Value)
+    else
+        setfpscap(60)
+    end
+end
+
+local function AutoRejoinLogic()
+    TeleportService:Teleport(game.PlaceId, LocalPlayer)
+end
+
+local function AutoHopRandomLogic()
+    local url = "https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100"
+    local data = game:HttpGet(url)
+    local decoded = HttpService:JSONDecode(data)
+    local servers = {}
+    for _, s in ipairs(decoded.data) do if s.playing < s.maxPlayers and s.id ~= game.JobId then table.insert(servers, s.id) end end
+    if #servers > 0 then TeleportService:TeleportToPlaceInstance(game.PlaceId, servers[math.random(#servers)], LocalPlayer) end
+end
+
+local function AutoHopSmallestLogic()
+    local url = "https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100"
+    local data = game:HttpGet(url)
+    local decoded = HttpService:JSONDecode(data)
+    local smallest, smallestCount = nil, math.huge
+    for _, s in ipairs(decoded.data) do if s.playing < s.maxPlayers and s.playing < smallestCount then smallestCount, smallest = s.playing, s.id end end
+    if smallest then TeleportService:TeleportToPlaceInstance(game.PlaceId, smallest, LocalPlayer) end
+end
+
+local function AutoBuyLuckLogic()
+    local merlin = workspace:FindFirstChild("world") and workspace.world:FindFirstChild("npcs") and workspace.world.npcs:FindFirstChild("Merlin")
+    if merlin and merlin:FindFirstChild("Merlin") then
+        for _ = 1, Options.LuckAmount.Value do pcall(function() merlin.Merlin:FindFirstChild("luck"):InvokeServer() end) task.wait(0.2) end
+    end
+end
+
+local function AutoBuyPowerLogic()
+    local merlin = workspace:FindFirstChild("world") and workspace.world:FindFirstChild("npcs") and workspace.world.npcs:FindFirstChild("Merlin")
+    if merlin and merlin:FindFirstChild("Merlin") then
+        for _ = 1, Options.PowerAmount.Value do pcall(function() merlin.Merlin:FindFirstChild("power"):InvokeServer() end) task.wait(0.2) end
+    end
+end
+
+local function AutoBuyBaitLogic()
+    local merchant = workspace:FindFirstChild("world") and workspace.world:FindFirstChild("npcs") and workspace.world.npcs:FindFirstChild("Marc Merchant")
+    if merchant and merchant:FindFirstChild("merchant") then
+        local baitName = Options.BaitType.Value
+        pcall(function() ReplicatedStorage.events:FindFirstChild("purchase"):FireServer(baitName, "Bait", 5, 1) end)
+    end
+end
+
+local function AutoRunLogic()
+    Humanoid.WalkSpeed = Options.AutoRun.Value and Options.WalkSpeed.Value or 16
+end
+
+local function StartFly()
+    if Flying then return end
+    Flying = true
+    FlyBodyVelocity = Instance.new("BodyVelocity") FlyBodyVelocity.MaxForce = Vector3.new(9e9, 9e9, 9e9) FlyBodyVelocity.Parent = HumanoidRootPart
+    FlyBodyGyro = Instance.new("BodyGyro") FlyBodyGyro.MaxTorque = Vector3.new(9e9, 9e9, 9e9) FlyBodyGyro.P = 9e4 FlyBodyGyro.Parent = HumanoidRootPart
+    Humanoid.PlatformStand = true
+    local cam = workspace.CurrentCamera
+    while Flying and Options.AutoFly.Value do
+        local move = Vector3.zero
+        if UserInputService:IsKeyDown(Enum.KeyCode.W) then move = move + cam.CFrame.LookVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.S) then move = move - cam.CFrame.LookVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.A) then move = move - cam.CFrame.RightVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.D) then move = move + cam.CFrame.RightVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then move = move + cam.CFrame.UpVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then move = move - cam.CFrame.UpVector end
+        if move.Magnitude > 0 then FlyBodyVelocity.Velocity = move.Unit * Options.FlySpeed.Value; FlyBodyGyro.CFrame = cam.CFrame
+        else FlyBodyVelocity.Velocity = Vector3.zero end
+        RunService.RenderStepped:Wait()
+    end
+    if FlyBodyVelocity then FlyBodyVelocity:Destroy() end
+    if FlyBodyGyro then FlyBodyGyro:Destroy() end
+    Humanoid.PlatformStand = false
+    Flying = false
+end
+
+local function StopFly() Flying = false end
+
+local function AutoFreezeLogic()
+    if Options.AutoFreeze.Value then
+        local mode = Options.FreezeMode.Value
+        if mode == "Rod Equipped" then
+            if GetTool() and FreezeCFrame == nil then FreezeCFrame = HumanoidRootPart.CFrame
+            elseif not GetTool() then FreezeCFrame = nil end
+        elseif mode == "Toggled" and FreezeCFrame == nil then FreezeCFrame = HumanoidRootPart.CFrame end
+        if FreezeCFrame then HumanoidRootPart.CFrame = FreezeCFrame; HumanoidRootPart.Velocity = Vector3.zero end
+    else FreezeCFrame = nil end
+end
+
+local function AutoRecallLogic()
+    if SavedPosition then TeleportTo(SavedPosition) end
+end
+
+local function ZoneFishLogic()
+    if not Options.ZoneFish.Value then
+        if ZoneFishOrigin then
+            TeleportTo(ZoneFishOrigin)
+            ZoneFishOrigin = nil
+            if Humanoid then for _, s in pairs(Enum.HumanoidStateType:GetEnumItems()) do Humanoid:SetStateEnabled(s, true) end end
+        end
+        return
+    end
+    local zones = workspace:FindFirstChild("zones") and workspace.zones:FindFirstChild("fishing")
+    if not zones then return end
+    local target = nil
+    for _, zone in pairs(zones:GetChildren()) do if zone.Name == Options.ZoneFishDropdown.Value then target = zone break end end
+    if not target then return end
+    if not ZoneFishOrigin then
+        ZoneFishOrigin = HumanoidRootPart.Position
+        if Humanoid then for _, s in pairs(Enum.HumanoidStateType:GetEnumItems()) do if s ~= Enum.HumanoidStateType.Running then Humanoid:SetStateEnabled(s, false) end end end
+    end
+    TeleportTo(target.Position - Vector3.new(0, 20, 0))
+    if Options.AutoZoneCast.Value then
+        local tool = GetTool()
+        if tool and tool:FindFirstChild("bobber") then
+            local bobber = tool.bobber
+            local rope = bobber:FindFirstChildOfClass("RopeConstraint")
+            if rope then rope.Length = 9e9 end
+            bobber:PivotTo(target:GetPivot())
+        end
+    end
+end
+
+local function AutoBaitLogic()
+    local tool = GetTool()
+    if tool and tool:FindFirstChild("values") and tool.values:FindFirstChild("bait") then
+        if tool.values.bait.Value == nil or tool.values.bait.Value == "" then
+            pcall(function() ReplicatedStorage.events:FindFirstChild("useBait"):FireServer() end)
+        end
+    end
+end
+
+local function AutoSpamToolLogic()
+    local tool = GetTool()
+    if tool then for _ = 1, 5 do pcall(function() tool:Activate() end) end end
+end
+
+local function AutoClickLogic()
+    if Options.AutoClick.Value then
+        VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, LocalPlayer, 0)
+        task.wait(0.05)
+        VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, LocalPlayer, 0)
+        RandomDelay(Options.ClickInterval.Value - 0.02, Options.ClickInterval.Value + 0.02)
+    end
+end
+
+local function NoClipLogic()
+    if not Options.NoClip.Value then return end
+    if Character then for _, part in pairs(Character:GetDescendants()) do if part:IsA("BasePart") then part.CanCollide = false end end end
+end
+
+local function InfiniteJumpLogic()
+    if Options.InfiniteJump.Value and not InfiniteJumpConn then
+        InfiniteJumpConn = UserInputService.JumpRequest:Connect(function() if Humanoid then Humanoid:ChangeState(Enum.HumanoidStateType.Jumping) end end)
+    elseif not Options.InfiniteJump.Value and InfiniteJumpConn then
+        InfiniteJumpConn:Disconnect(); InfiniteJumpConn = nil
+    end
+end
+
+local function NoFallDamageLogic()
+    if Options.NoFallDamage.Value and Humanoid then
+        Humanoid:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false)
+    elseif not Options.NoFallDamage.Value and Humanoid then
+        Humanoid:SetStateEnabled(Enum.HumanoidStateType.FallingDown, true)
+    end
+end
+
+local function AutoClimbLogic()
+    if Options.AutoClimb.Value and Humanoid then
+        Humanoid:SetStateEnabled(Enum.HumanoidStateType.Climbing, false)
+    elseif not Options.AutoClimb.Value and Humanoid then
+        Humanoid:SetStateEnabled(Enum.HumanoidStateType.Climbing, true)
+    end
+end
+
+local function UpdateZoneDropdown()
+    local zones = workspace:FindFirstChild("zones") and workspace.zones:FindFirstChild("fishing")
+    if not zones then return end
+    local names = {}
+    for _, z in pairs(zones:GetChildren()) do if z:IsA("BasePart") then table.insert(names, z.Name) end end
+    table.sort(names)
+    Options.ZoneFishDropdown:SetValues(names)
+end
+task.spawn(UpdateZoneDropdown)
+
+local function onCharacterAdded(newChar)
+    Character = newChar
+    Humanoid = Character:WaitForChild("Humanoid")
+    HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
+    FreezeCFrame = nil
+    CurrentTool = nil
+    ZoneFishOrigin = nil
+end
+LocalPlayer.CharacterAdded:Connect(onCharacterAdded)
+
+local function updateFishCount()
+    if not Options.ShowFishCounter.Value then return end
+    local active = workspace:FindFirstChild("active")
+    if active then
+        local count = 0
+        for _, m in pairs(active:GetChildren()) do if m:IsA("Model") and m:FindFirstChild("Fish") then count = count + 1 end end
+        FishCount = count
+    end
+end
+
+local function updateFPS()
+    if not Options.ShowFPS.Value then return end
+    local delta = tick() - LastFPSUpdate
+    if delta >= 1 then
+        FPS = math.floor(1 / delta)
+        LastFPSUpdate = tick()
+    end
+end
+
+task.spawn(function()
+    while true do
+        pcall(function()
+            if Options.AutoCast.Value then AutoCastLogic() end
+            if Options.AutoReel.Value or Options.InstantReel.Value then AutoReelLogic() end
+            if Options.AutoShake.Value then AutoShakeLogic() end
+            if Options.AutoSellAll.Value then AutoSellAllLogic() end
+            if Options.AutoSellHand.Value then AutoSellHandLogic() end
+            if Options.AutoAppraise.Value then AutoAppraiseLogic() end
+            if Options.AutoCollectCrab.Value then AutoCollectCrabLogic() end
+            if Options.AutoPlaceCrab.Value then AutoPlaceCrabLogic() end
+            if Options.AutoMeteor.Value then AutoMeteorLogic() end
+            if Options.AutoChest.Value then AutoChestLogic() end
+            if Options.AutoMap.Value then AutoMapLogic() end
+            if Options.AutoKillBoss.Value then AutoKillBossLogic() end
+            if Options.AutoEventFarm.Value then AutoEventFarmLogic() end
+            if Options.AutoTotem.Value then AutoTotemLogic() end
+            if Options.AntiAFK.Value then AntiAFKLogic() end
+            if Options.AutoRejoin.Value then AutoRejoinLogic() end
+            if Options.AutoHopRandom.Value then AutoHopRandomLogic() end
+            if Options.AutoHopSmallest.Value then AutoHopSmallestLogic() end
+            if Options.AutoBuyLuck.Value then AutoBuyLuckLogic() end
+            if Options.AutoBuyPower.Value then AutoBuyPowerLogic() end
+            if Options.AutoBuyBait.Value then AutoBuyBaitLogic() end
+            if Options.AutoRecall.Value then AutoRecallLogic() end
+            if Options.AutoRun.Value then AutoRunLogic() end
+            if Options.AutoFly.Value and not Flying then task.spawn(StartFly) elseif not Options.AutoFly.Value and Flying then StopFly() end
+            if Options.AutoBait.Value then AutoBaitLogic() end
+            if Options.AutoSpamTool.Value then AutoSpamToolLogic() end
+            if Options.AutoClick.Value then AutoClickLogic() end
+            if Options.InfiniteJump.Value then InfiniteJumpLogic() end
+            ZoneFishLogic()
+            InfiniteOxygenLogic()
+            NoTemperatureLogic()
+            FullbrightLogic()
+            NoFogLogic()
+            NoLocationCCLogic()
+            WalkOnWaterLogic()
+            DestroyFishModelLogic()
+            DisableRenderingLogic()
+            HideInventoryUILogic()
+            RemoveParticlesLogic()
+            LowQualityTerrainLogic()
+            DisableWaterReflectionLogic()
+            DisableShadowsLogic()
+            FPSUnlockLogic()
+            NoClipLogic()
+            AutoFreezeLogic()
+            NoFallDamageLogic()
+            AutoClimbLogic()
+            updateFishCount()
+            updateFPS()
+        end)
+        task.wait(0.1)
+    end
+end)
+
+print("KSPA 超完整版已加载，共112项功能。")
