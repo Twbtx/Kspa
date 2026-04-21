@@ -1,0 +1,743 @@
+--[[
+    Ketamine UI 库 - 基于原始 Ketamine 界面重构
+    去除所有功能（间谍/扫描等），仅提供 UI 框架和组件 API
+]]
+
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+local Kit = {}
+Kit.__index = Kit
+
+-- 工具函数：使 GUI 可拖动
+local function MakeDraggable(guiObject)
+    local dragging, dragStart, startPos
+    local function inputBegan(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = guiObject.Position
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                end
+            end)
+        end
+    end
+    local function inputChanged(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+            if dragging then
+                local delta = input.Position - dragStart
+                guiObject.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+            end
+        end
+    end
+    guiObject.InputBegan:Connect(inputBegan)
+    UserInputService.InputChanged:Connect(inputChanged)
+end
+
+-- 主窗口类
+local Window = {}
+Window.__index = Window
+
+function Window:AddPage(name)
+    local pageFrame = Instance.new("Frame")
+    pageFrame.Name = name
+    pageFrame.Parent = self.PagesContainer
+    pageFrame.Size = UDim2.new(1, 0, 1, 0)
+    pageFrame.BackgroundTransparency = 1
+    pageFrame.Visible = false
+    
+    -- 创建侧边栏按钮
+    local btn = self:CreateSideButton(name)
+    
+    -- 页面内容滚动框
+    local scroll = Instance.new("ScrollingFrame")
+    scroll.Parent = pageFrame
+    scroll.Size = UDim2.new(1, 0, 0.95, 0)
+    scroll.Position = UDim2.new(0, 0, 0.025, 0)
+    scroll.BackgroundTransparency = 1
+    scroll.ScrollBarThickness = 6
+    scroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+    scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    
+    local layout = Instance.new("UIListLayout")
+    layout.Parent = scroll
+    layout.SortOrder = Enum.SortOrder.LayoutOrder
+    layout.Padding = UDim.new(0, 5)
+    
+    local pageObj = {
+        Frame = pageFrame,
+        Scroll = scroll,
+        Layout = layout,
+        Buttons = {},
+        AddButton = function(self, text, callback)
+            local btn = self:MakeButton(text, callback)
+            btn.Parent = scroll
+            return btn
+        end,
+        AddToggle = function(self, text, default, callback)
+            local toggle = self:MakeToggle(text, default, callback)
+            toggle.Parent = scroll
+            return toggle
+        end,
+        AddSlider = function(self, text, min, max, default, callback)
+            local slider = self:MakeSlider(text, min, max, default, callback)
+            slider.Parent = scroll
+            return slider
+        end,
+        AddLabel = function(self, text)
+            local label = self:MakeLabel(text)
+            label.Parent = scroll
+            return label
+        end,
+        MakeButton = function(self, text, callback)
+            local btn = Instance.new("TextButton")
+            btn.Size = UDim2.new(0.96, 0, 0, 40)
+            btn.Position = UDim2.new(0.02, 0, 0, 0)
+            btn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+            btn.Text = text
+            btn.TextColor3 = Color3.new(1, 1, 1)
+            btn.Font = Enum.Font.Gotham
+            btn.TextScaled = true
+            local corner = Instance.new("UICorner")
+            corner.Parent = btn
+            corner.CornerRadius = UDim.new(0.2, 0)
+            btn.MouseButton1Click:Connect(callback)
+            return btn
+        end,
+        MakeToggle = function(self, text, default, callback)
+            local frame = Instance.new("TextButton")
+            frame.Size = UDim2.new(0.96, 0, 0, 40)
+            frame.Position = UDim2.new(0.02, 0, 0, 0)
+            frame.BackgroundTransparency = 1
+            frame.Text = ""
+            frame.AutoButtonColor = false
+            
+            local label = Instance.new("TextLabel")
+            label.Parent = frame
+            label.Size = UDim2.new(0.8, 0, 0.5, 0)
+            label.Position = UDim2.new(0.05, 0, 0.5, 0)
+            label.AnchorPoint = Vector2.new(0, 0.5)
+            label.BackgroundTransparency = 1
+            label.Text = text
+            label.TextColor3 = Color3.new(1, 1, 1)
+            label.TextScaled = true
+            label.TextXAlignment = Enum.TextXAlignment.Left
+            label.Font = Enum.Font.Gotham
+            
+            local stateBg = Instance.new("Frame")
+            stateBg.Parent = frame
+            stateBg.Size = UDim2.new(0.1, 0, 0.5, 0)
+            stateBg.Position = UDim2.new(0.95, 0, 0.5, 0)
+            stateBg.AnchorPoint = Vector2.new(1, 0.5)
+            stateBg.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+            stateBg.BorderSizePixel = 0
+            local corner = Instance.new("UICorner")
+            corner.Parent = stateBg
+            corner.CornerRadius = UDim.new(1, 0)
+            
+            local stateCircle = Instance.new("Frame")
+            stateCircle.Parent = stateBg
+            stateCircle.Size = UDim2.new(0.5, 0, 1, 0)
+            stateCircle.BackgroundColor3 = Color3.new(1, 1, 1)
+            stateCircle.BorderSizePixel = 0
+            local circleCorner = Instance.new("UICorner")
+            circleCorner.Parent = stateCircle
+            circleCorner.CornerRadius = UDim.new(1, 0)
+            
+            local function setState(state)
+                if state then
+                    stateCircle.Position = UDim2.new(0.5, 0, 0, 0)
+                    stateBg.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+                else
+                    stateCircle.Position = UDim2.new(0, 0, 0, 0)
+                    stateBg.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+                end
+            end
+            setState(default)
+            
+            frame.MouseButton1Click:Connect(function()
+                default = not default
+                setState(default)
+                if callback then callback(default) end
+            end)
+            
+            return frame
+        end,
+        MakeSlider = function(self, text, min, max, default, callback)
+            local frame = Instance.new("Frame")
+            frame.Size = UDim2.new(0.96, 0, 0, 50)
+            frame.Position = UDim2.new(0.02, 0, 0, 0)
+            frame.BackgroundTransparency = 1
+            
+            local label = Instance.new("TextLabel")
+            label.Parent = frame
+            label.Size = UDim2.new(0.5, 0, 0.3, 0)
+            label.Position = UDim2.new(0.05, 0, 0, 0)
+            label.BackgroundTransparency = 1
+            label.Text = text
+            label.TextColor3 = Color3.new(1, 1, 1)
+            label.TextScaled = true
+            label.TextXAlignment = Enum.TextXAlignment.Left
+            label.Font = Enum.Font.Gotham
+            
+            local valueLabel = Instance.new("TextLabel")
+            valueLabel.Parent = frame
+            valueLabel.Size = UDim2.new(0.3, 0, 0.3, 0)
+            valueLabel.Position = UDim2.new(0.95, 0, 0, 0)
+            valueLabel.AnchorPoint = Vector2.new(1, 0)
+            valueLabel.BackgroundTransparency = 1
+            valueLabel.Text = tostring(default)
+            valueLabel.TextColor3 = Color3.fromRGB(0, 170, 255)
+            valueLabel.TextScaled = true
+            valueLabel.Font = Enum.Font.Gotham
+            
+            local sliderBg = Instance.new("Frame")
+            sliderBg.Parent = frame
+            sliderBg.Size = UDim2.new(0.9, 0, 0, 4)
+            sliderBg.Position = UDim2.new(0.05, 0, 0.7, 0)
+            sliderBg.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+            sliderBg.BorderSizePixel = 0
+            local corner = Instance.new("UICorner")
+            corner.Parent = sliderBg
+            corner.CornerRadius = UDim.new(1, 0)
+            
+            local fill = Instance.new("Frame")
+            fill.Parent = sliderBg
+            fill.Size = UDim2.new((default - min) / (max - min), 0, 1, 0)
+            fill.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+            fill.BorderSizePixel = 0
+            
+            local sliderBtn = Instance.new("TextButton")
+            sliderBtn.Parent = sliderBg
+            sliderBtn.Size = UDim2.new(0, 12, 0, 12)
+            sliderBtn.Position = UDim2.new((default - min) / (max - min), -6, 0.5, -6)
+            sliderBtn.BackgroundColor3 = Color3.new(1, 1, 1)
+            sliderBtn.Text = ""
+            local btnCorner = Instance.new("UICorner")
+            btnCorner.Parent = sliderBtn
+            btnCorner.CornerRadius = UDim.new(1, 0)
+            
+            local dragging = false
+            sliderBtn.MouseButton1Down:Connect(function()
+                dragging = true
+            end)
+            UserInputService.InputEnded:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                    dragging = false
+                end
+            end)
+            UserInputService.InputChanged:Connect(function(input)
+                if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+                    local pos = UserInputService:GetMouseLocation().X
+                    local absPos = sliderBg.AbsolutePosition.X
+                    local width = sliderBg.AbsoluteSize.X
+                    local percent = math.clamp((pos - absPos) / width, 0, 1)
+                    local val = min + percent * (max - min)
+                    val = math.round(val)
+                    fill.Size = UDim2.new(percent, 0, 1, 0)
+                    sliderBtn.Position = UDim2.new(percent, -6, 0.5, -6)
+                    valueLabel.Text = tostring(val)
+                    if callback then callback(val) end
+                end
+            end)
+            
+            return frame
+        end,
+        MakeLabel = function(self, text)
+            local label = Instance.new("TextLabel")
+            label.Size = UDim2.new(0.96, 0, 0, 30)
+            label.Position = UDim2.new(0.02, 0, 0, 0)
+            label.BackgroundTransparency = 1
+            label.Text = text
+            label.TextColor3 = Color3.fromRGB(200, 200, 200)
+            label.TextScaled = true
+            label.TextXAlignment = Enum.TextXAlignment.Left
+            label.Font = Enum.Font.Gotham
+            return label
+        end
+    }
+    
+    setmetatable(pageObj, {__index = pageObj})
+    self.Pages[name] = pageObj
+    return pageObj
+end
+
+function Window:CreateSideButton(name)
+    local btn = Instance.new("TextButton")
+    btn.Name = name
+    btn.Parent = self.SideList
+    btn.Size = UDim2.new(1, 0, 0, 40)
+    btn.BackgroundTransparency = 1
+    btn.Text = ""
+    btn.LayoutOrder = self.SideOrder
+    self.SideOrder = self.SideOrder + 1
+    
+    local cut = Instance.new("Frame")
+    cut.Parent = btn
+    cut.Size = UDim2.new(0.5, 0, 1, 0)
+    cut.Position = UDim2.new(0.5, 0, 0, 0)
+    cut.AnchorPoint = Vector2.new(0.5, 0)
+    cut.BackgroundTransparency = 1
+    
+    local label = Instance.new("TextLabel")
+    label.Parent = cut
+    label.Size = UDim2.new(0.8, 0, 0.4, 0)
+    label.Position = UDim2.new(0.5, 0, 0.5, 0)
+    label.AnchorPoint = Vector2.new(0.5, 0.5)
+    label.BackgroundTransparency = 1
+    label.Text = name
+    label.TextColor3 = Color3.new(1, 1, 1)
+    label.TextScaled = true
+    label.Font = Enum.Font.Gotham
+    
+    btn.MouseButton1Click:Connect(function()
+        self:SwitchPage(name)
+    end)
+    
+    return btn
+end
+
+function Window:SwitchPage(pageName)
+    for name, page in pairs(self.Pages) do
+        page.Frame.Visible = (name == pageName)
+    end
+    for _, btn in ipairs(self.SideList:GetChildren()) do
+        if btn:IsA("TextButton") then
+            btn.BackgroundTransparency = (btn.Name == pageName) and 0.95 or 1
+        end
+    end
+end
+
+function Window:Destroy()
+    self.Gui:Destroy()
+end
+
+-- 创建主窗口
+function Kit.CreateWindow(title, widthScale, heightScale)
+    widthScale = widthScale or 0.4
+    heightScale = heightScale or 0.4
+    
+    local guiRoot = (getfenv().gethui and getfenv().gethui()) or Players.LocalPlayer:WaitForChild("PlayerGui")
+    
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "KetamineUI"
+    screenGui.Parent = guiRoot
+    screenGui.Enabled = true
+    screenGui.DisplayOrder = 999999999
+    
+    local window = Instance.new("TextButton")
+    window.Name = "Window"
+    window.Parent = screenGui
+    window.Size = UDim2.new(widthScale, 0, heightScale, 0)
+    window.Position = UDim2.new(0.5, 0, 0.5, 0)
+    window.AnchorPoint = Vector2.new(0.5, 0.5)
+    window.BackgroundTransparency = 1
+    window.Text = ""
+    window.AutoButtonColor = false
+    
+    local shadow = Instance.new("ImageLabel")
+    shadow.Name = "Shadow"
+    shadow.Parent = window
+    shadow.Size = UDim2.new(1.1, 0, 1.15, 0)
+    shadow.Position = UDim2.new(0.515, 0, 0.525, 0)
+    shadow.AnchorPoint = Vector2.new(0.5, 0.5)
+    shadow.BackgroundTransparency = 1
+    shadow.Image = "rbxassetid://8774493213"
+    shadow.ImageTransparency = 0.2
+    shadow.ScaleType = Enum.ScaleType.Slice
+    shadow.SliceCenter = Rect.new(135, 135, 889, 512)
+    
+    local mainFrame = Instance.new("Frame")
+    mainFrame.Name = "Main"
+    mainFrame.Parent = window
+    mainFrame.Size = UDim2.new(1, 0, 1, 0)
+    mainFrame.BackgroundColor3 = Color3.fromRGB(27, 27, 27)
+    mainFrame.BackgroundTransparency = 0.2
+    mainFrame.BorderSizePixel = 0
+    local corner = Instance.new("UICorner")
+    corner.Parent = mainFrame
+    corner.CornerRadius = UDim.new(0.01, 0)
+    
+    -- 标题栏
+    local topbar = Instance.new("Frame")
+    topbar.Name = "Topbar"
+    topbar.Parent = mainFrame
+    topbar.Size = UDim2.new(1, 0, 0.1, 0)
+    topbar.BackgroundTransparency = 1
+    
+    local titleLabel = Instance.new("TextLabel")
+    titleLabel.Parent = topbar
+    titleLabel.Size = UDim2.new(0.93, 0, 1, 0)
+    titleLabel.Position = UDim2.new(0.07, 0, 0, 0)
+    titleLabel.BackgroundTransparency = 1
+    titleLabel.Text = title or "Ketamine UI"
+    titleLabel.TextColor3 = Color3.new(1, 1, 1)
+    titleLabel.TextScaled = true
+    titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+    titleLabel.Font = Enum.Font.GothamBold
+    
+    local btnFrame = Instance.new("Frame")
+    btnFrame.Parent = topbar
+    btnFrame.Size = UDim2.new(0.5, 0, 1, 0)
+    btnFrame.Position = UDim2.new(0.995, 0, 0, 0)
+    btnFrame.AnchorPoint = Vector2.new(1, 0)
+    btnFrame.BackgroundTransparency = 1
+    
+    local minimizeBtn = Instance.new("TextButton")
+    minimizeBtn.Parent = btnFrame
+    minimizeBtn.Size = UDim2.new(0.5, 0, 1, 0)
+    minimizeBtn.BackgroundTransparency = 1
+    minimizeBtn.Text = ""
+    local minIcon = Instance.new("ImageLabel")
+    minIcon.Parent = minimizeBtn
+    minIcon.Size = UDim2.new(0.35, 0, 0.7, 0)
+    minIcon.Position = UDim2.new(0.5, 0, 0.5, 0)
+    minIcon.AnchorPoint = Vector2.new(0.5, 0.5)
+    minIcon.Image = "rbxassetid://16239957665"
+    minIcon.BackgroundTransparency = 1
+    
+    local closeBtn = Instance.new("TextButton")
+    closeBtn.Parent = btnFrame
+    closeBtn.Size = UDim2.new(0.5, 0, 1, 0)
+    closeBtn.Position = UDim2.new(0.5, 0, 0, 0)
+    closeBtn.BackgroundTransparency = 1
+    closeBtn.Text = ""
+    local closeIcon = Instance.new("ImageLabel")
+    closeIcon.Parent = closeBtn
+    closeIcon.Size = UDim2.new(0.5, 0, 0.5, 0)
+    closeIcon.Position = UDim2.new(0.5, 0, 0.5, 0)
+    closeIcon.AnchorPoint = Vector2.new(0.5, 0.5)
+    closeIcon.Image = "rbxassetid://10152135063"
+    closeIcon.BackgroundTransparency = 1
+    
+    -- 内容区域
+    local contents = Instance.new("Frame")
+    contents.Name = "Contents"
+    contents.Parent = mainFrame
+    contents.Size = UDim2.new(1, 0, 0.9, 0)
+    contents.Position = UDim2.new(0, 0, 0.1, 0)
+    contents.BackgroundTransparency = 1
+    
+    -- 侧边栏
+    local sideBar = Instance.new("Frame")
+    sideBar.Parent = contents
+    sideBar.Size = UDim2.new(0.2, 0, 0.95, 0)
+    sideBar.Position = UDim2.new(0, 0, 0.025, 0)
+    sideBar.BackgroundTransparency = 1
+    
+    local sideList = Instance.new("ScrollingFrame")
+    sideList.Parent = sideBar
+    sideList.Size = UDim2.new(1, 0, 1, 0)
+    sideList.BackgroundTransparency = 1
+    sideList.ScrollBarThickness = 0
+    sideList.CanvasSize = UDim2.new(0, 0, 0, 0)
+    sideList.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    
+    local sideLayout = Instance.new("UIListLayout")
+    sideLayout.Parent = sideList
+    sideLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    sideLayout.Padding = UDim.new(0, 0)
+    
+    -- 页面容器
+    local pagesContainer = Instance.new("Frame")
+    pagesContainer.Parent = contents
+    pagesContainer.Size = UDim2.new(0.8, 0, 1, 0)
+    pagesContainer.Position = UDim2.new(0.2, 0, 0, 0)
+    pagesContainer.BackgroundTransparency = 1
+    
+    -- 窗口对象
+    local winObj = {
+        Gui = screenGui,
+        Window = window,
+        Main = mainFrame,
+        SideList = sideList,
+        PagesContainer = pagesContainer,
+        Pages = {},
+        SideOrder = 0,
+        CreateSideButton = function(self, name) end, -- 稍后绑定
+        SwitchPage = function(self, pageName) end,
+        AddPage = function(self, name) end,
+        Destroy = function(self) self.Gui:Destroy() end
+    }
+    setmetatable(winObj, {__index = Window})
+    
+    -- 绑定方法
+    winObj.CreateSideButton = function(self, name)
+        local btn = Instance.new("TextButton")
+        btn.Name = name
+        btn.Parent = self.SideList
+        btn.Size = UDim2.new(1, 0, 0, 40)
+        btn.BackgroundTransparency = 1
+        btn.Text = ""
+        btn.LayoutOrder = self.SideOrder
+        self.SideOrder = self.SideOrder + 1
+        
+        local cut = Instance.new("Frame")
+        cut.Parent = btn
+        cut.Size = UDim2.new(0.5, 0, 1, 0)
+        cut.Position = UDim2.new(0.5, 0, 0, 0)
+        cut.AnchorPoint = Vector2.new(0.5, 0)
+        cut.BackgroundTransparency = 1
+        
+        local label = Instance.new("TextLabel")
+        label.Parent = cut
+        label.Size = UDim2.new(0.8, 0, 0.4, 0)
+        label.Position = UDim2.new(0.5, 0, 0.5, 0)
+        label.AnchorPoint = Vector2.new(0.5, 0.5)
+        label.BackgroundTransparency = 1
+        label.Text = name
+        label.TextColor3 = Color3.new(1, 1, 1)
+        label.TextScaled = true
+        label.Font = Enum.Font.Gotham
+        
+        btn.MouseButton1Click:Connect(function()
+            self:SwitchPage(name)
+        end)
+        
+        return btn
+    end
+    
+    winObj.SwitchPage = function(self, pageName)
+        for name, page in pairs(self.Pages) do
+            page.Frame.Visible = (name == pageName)
+        end
+        for _, btn in ipairs(self.SideList:GetChildren()) do
+            if btn:IsA("TextButton") then
+                btn.BackgroundTransparency = (btn.Name == pageName) and 0.95 or 1
+            end
+        end
+    end
+    
+    winObj.AddPage = function(self, name)
+        local pageFrame = Instance.new("Frame")
+        pageFrame.Name = name
+        pageFrame.Parent = self.PagesContainer
+        pageFrame.Size = UDim2.new(1, 0, 1, 0)
+        pageFrame.BackgroundTransparency = 1
+        pageFrame.Visible = false
+        
+        self:CreateSideButton(name)
+        
+        local scroll = Instance.new("ScrollingFrame")
+        scroll.Parent = pageFrame
+        scroll.Size = UDim2.new(1, 0, 0.95, 0)
+        scroll.Position = UDim2.new(0, 0, 0.025, 0)
+        scroll.BackgroundTransparency = 1
+        scroll.ScrollBarThickness = 6
+        scroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+        scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+        
+        local layout = Instance.new("UIListLayout")
+        layout.Parent = scroll
+        layout.SortOrder = Enum.SortOrder.LayoutOrder
+        layout.Padding = UDim.new(0, 5)
+        
+        local pageObj = {
+            Frame = pageFrame,
+            Scroll = scroll,
+            Layout = layout,
+            AddButton = function(self, text, callback)
+                local btn = Instance.new("TextButton")
+                btn.Size = UDim2.new(0.96, 0, 0, 40)
+                btn.Position = UDim2.new(0.02, 0, 0, 0)
+                btn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+                btn.Text = text
+                btn.TextColor3 = Color3.new(1, 1, 1)
+                btn.Font = Enum.Font.Gotham
+                btn.TextScaled = true
+                local corner = Instance.new("UICorner")
+                corner.Parent = btn
+                corner.CornerRadius = UDim.new(0.2, 0)
+                btn.MouseButton1Click:Connect(callback)
+                btn.Parent = scroll
+                return btn
+            end,
+            AddToggle = function(self, text, default, callback)
+                local frame = Instance.new("TextButton")
+                frame.Size = UDim2.new(0.96, 0, 0, 40)
+                frame.Position = UDim2.new(0.02, 0, 0, 0)
+                frame.BackgroundTransparency = 1
+                frame.Text = ""
+                frame.AutoButtonColor = false
+                
+                local label = Instance.new("TextLabel")
+                label.Parent = frame
+                label.Size = UDim2.new(0.8, 0, 0.5, 0)
+                label.Position = UDim2.new(0.05, 0, 0.5, 0)
+                label.AnchorPoint = Vector2.new(0, 0.5)
+                label.BackgroundTransparency = 1
+                label.Text = text
+                label.TextColor3 = Color3.new(1, 1, 1)
+                label.TextScaled = true
+                label.TextXAlignment = Enum.TextXAlignment.Left
+                label.Font = Enum.Font.Gotham
+                
+                local stateBg = Instance.new("Frame")
+                stateBg.Parent = frame
+                stateBg.Size = UDim2.new(0.1, 0, 0.5, 0)
+                stateBg.Position = UDim2.new(0.95, 0, 0.5, 0)
+                stateBg.AnchorPoint = Vector2.new(1, 0.5)
+                stateBg.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+                stateBg.BorderSizePixel = 0
+                local corner = Instance.new("UICorner")
+                corner.Parent = stateBg
+                corner.CornerRadius = UDim.new(1, 0)
+                
+                local stateCircle = Instance.new("Frame")
+                stateCircle.Parent = stateBg
+                stateCircle.Size = UDim2.new(0.5, 0, 1, 0)
+                stateCircle.BackgroundColor3 = Color3.new(1, 1, 1)
+                stateCircle.BorderSizePixel = 0
+                local circleCorner = Instance.new("UICorner")
+                circleCorner.Parent = stateCircle
+                circleCorner.CornerRadius = UDim.new(1, 0)
+                
+                local function setState(state)
+                    if state then
+                        stateCircle.Position = UDim2.new(0.5, 0, 0, 0)
+                        stateBg.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+                    else
+                        stateCircle.Position = UDim2.new(0, 0, 0, 0)
+                        stateBg.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+                    end
+                end
+                setState(default)
+                
+                frame.MouseButton1Click:Connect(function()
+                    default = not default
+                    setState(default)
+                    if callback then callback(default) end
+                end)
+                
+                frame.Parent = scroll
+                return frame
+            end,
+            AddSlider = function(self, text, min, max, default, callback)
+                local frame = Instance.new("Frame")
+                frame.Size = UDim2.new(0.96, 0, 0, 50)
+                frame.Position = UDim2.new(0.02, 0, 0, 0)
+                frame.BackgroundTransparency = 1
+                
+                local label = Instance.new("TextLabel")
+                label.Parent = frame
+                label.Size = UDim2.new(0.5, 0, 0.3, 0)
+                label.Position = UDim2.new(0.05, 0, 0, 0)
+                label.BackgroundTransparency = 1
+                label.Text = text
+                label.TextColor3 = Color3.new(1, 1, 1)
+                label.TextScaled = true
+                label.TextXAlignment = Enum.TextXAlignment.Left
+                label.Font = Enum.Font.Gotham
+                
+                local valueLabel = Instance.new("TextLabel")
+                valueLabel.Parent = frame
+                valueLabel.Size = UDim2.new(0.3, 0, 0.3, 0)
+                valueLabel.Position = UDim2.new(0.95, 0, 0, 0)
+                valueLabel.AnchorPoint = Vector2.new(1, 0)
+                valueLabel.BackgroundTransparency = 1
+                valueLabel.Text = tostring(default)
+                valueLabel.TextColor3 = Color3.fromRGB(0, 170, 255)
+                valueLabel.TextScaled = true
+                valueLabel.Font = Enum.Font.Gotham
+                
+                local sliderBg = Instance.new("Frame")
+                sliderBg.Parent = frame
+                sliderBg.Size = UDim2.new(0.9, 0, 0, 4)
+                sliderBg.Position = UDim2.new(0.05, 0, 0.7, 0)
+                sliderBg.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+                sliderBg.BorderSizePixel = 0
+                local corner = Instance.new("UICorner")
+                corner.Parent = sliderBg
+                corner.CornerRadius = UDim.new(1, 0)
+                
+                local fill = Instance.new("Frame")
+                fill.Parent = sliderBg
+                fill.Size = UDim2.new((default - min) / (max - min), 0, 1, 0)
+                fill.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+                fill.BorderSizePixel = 0
+                
+                local sliderBtn = Instance.new("TextButton")
+                sliderBtn.Parent = sliderBg
+                sliderBtn.Size = UDim2.new(0, 12, 0, 12)
+                sliderBtn.Position = UDim2.new((default - min) / (max - min), -6, 0.5, -6)
+                sliderBtn.BackgroundColor3 = Color3.new(1, 1, 1)
+                sliderBtn.Text = ""
+                local btnCorner = Instance.new("UICorner")
+                btnCorner.Parent = sliderBtn
+                btnCorner.CornerRadius = UDim.new(1, 0)
+                
+                local dragging = false
+                sliderBtn.MouseButton1Down:Connect(function()
+                    dragging = true
+                end)
+                UserInputService.InputEnded:Connect(function(input)
+                    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                        dragging = false
+                    end
+                end)
+                UserInputService.InputChanged:Connect(function(input)
+                    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+                        local pos = UserInputService:GetMouseLocation().X
+                        local absPos = sliderBg.AbsolutePosition.X
+                        local width = sliderBg.AbsoluteSize.X
+                        local percent = math.clamp((pos - absPos) / width, 0, 1)
+                        local val = min + percent * (max - min)
+                        val = math.round(val)
+                        fill.Size = UDim2.new(percent, 0, 1, 0)
+                        sliderBtn.Position = UDim2.new(percent, -6, 0.5, -6)
+                        valueLabel.Text = tostring(val)
+                        if callback then callback(val) end
+                    end
+                end)
+                
+                frame.Parent = scroll
+                return frame
+            end,
+            AddLabel = function(self, text)
+                local label = Instance.new("TextLabel")
+                label.Size = UDim2.new(0.96, 0, 0, 30)
+                label.Position = UDim2.new(0.02, 0, 0, 0)
+                label.BackgroundTransparency = 1
+                label.Text = text
+                label.TextColor3 = Color3.fromRGB(200, 200, 200)
+                label.TextScaled = true
+                label.TextXAlignment = Enum.TextXAlignment.Left
+                label.Font = Enum.Font.Gotham
+                label.Parent = scroll
+                return label
+            end
+        }
+        setmetatable(pageObj, {__index = pageObj})
+        self.Pages[name] = pageObj
+        if self.SideOrder == 1 then
+            self:SwitchPage(name)
+        end
+        return pageObj
+    end
+    
+    MakeDraggable(window)
+    
+    -- 最小化/关闭逻辑
+    local minimized = false
+    minimizeBtn.MouseButton1Click:Connect(function()
+        if minimized then
+            window:TweenSize(UDim2.new(widthScale, 0, heightScale, 0), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.3, true)
+            minimized = false
+        else
+            window:TweenSize(UDim2.new(0.05, 0, 0.05, 0), Enum.EasingDirection.In, Enum.EasingStyle.Quad, 0.3, true)
+            minimized = true
+        end
+    end)
+    
+    closeBtn.MouseButton1Click:Connect(function()
+        screenGui:Destroy()
+    end)
+    
+    return winObj
+end
+
+return Kit
