@@ -1,0 +1,133 @@
+-- 纯净透视：方框 + 名字 + 血量条
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local CoreGui = game:GetService("CoreGui")
+local Camera = workspace.CurrentCamera
+local localPlayer = Players.LocalPlayer
+
+local ESP = {
+    Enabled = true,
+    MaxDistance = 200,
+    FontSize = 11,
+    BoxColor = Color3.fromRGB(255, 255, 255),      -- 方框颜色
+    NameColor = Color3.fromRGB(255, 255, 255),     -- 名字颜色
+    HealthBarColor = Color3.fromRGB(0, 255, 0),    -- 血量条颜色
+}
+
+local function createInstance(className, props)
+    local inst = Instance.new(className)
+    for k, v in pairs(props) do inst[k] = v end
+    return inst
+end
+
+local screenGui = createInstance("ScreenGui", { Name = "SimpleESP", Parent = CoreGui })
+
+local function setupESP(player)
+    if player == localPlayer then return end
+
+    local folder = createInstance("Folder", { Name = player.Name, Parent = screenGui })
+
+    -- 方框
+    local box = createInstance("Frame", {
+        Parent = folder,
+        BackgroundColor3 = ESP.BoxColor,
+        BackgroundTransparency = 0.7,
+        BorderSizePixel = 1,
+        BorderColor3 = ESP.BoxColor,
+        Visible = false,
+    })
+
+    -- 名字
+    local nameLabel = createInstance("TextLabel", {
+        Parent = folder,
+        Size = UDim2.new(0, 100, 0, 20),
+        AnchorPoint = Vector2.new(0.5, 0.5),
+        BackgroundTransparency = 1,
+        TextColor3 = ESP.NameColor,
+        Font = Enum.Font.Code,
+        TextSize = ESP.FontSize,
+        TextStrokeTransparency = 0,
+        TextStrokeColor3 = Color3.fromRGB(0, 0, 0),
+        Visible = false,
+    })
+
+    -- 血量条背景
+    local healthBg = createInstance("Frame", {
+        Parent = folder,
+        BackgroundColor3 = Color3.fromRGB(0, 0, 0),
+        BackgroundTransparency = 0.3,
+        Visible = false,
+    })
+
+    -- 血量条前景
+    local healthBar = createInstance("Frame", {
+        Parent = folder,
+        BackgroundColor3 = ESP.HealthBarColor,
+        BackgroundTransparency = 0,
+        Visible = false,
+    })
+
+    local function update()
+        local char = player.Character
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        local humanoid = char and char:FindFirstChildOfClass("Humanoid")
+        if not hrp or not humanoid or humanoid.Health <= 0 then
+            box.Visible = false
+            nameLabel.Visible = false
+            healthBar.Visible = false
+            healthBg.Visible = false
+            return
+        end
+
+        local pos, onScreen = Camera:WorldToScreenPoint(hrp.Position)
+        local distance = (Camera.CFrame.Position - hrp.Position).Magnitude
+        if not onScreen or distance > ESP.MaxDistance then
+            box.Visible = false
+            nameLabel.Visible = false
+            healthBar.Visible = false
+            healthBg.Visible = false
+            return
+        end
+
+        local size = hrp.Size.Y
+        local scale = (size * Camera.ViewportSize.Y) / (pos.Z * 2)
+        local width = 3 * scale
+        local height = 4.5 * scale
+
+        -- 方框
+        box.Position = UDim2.new(0, pos.X - width/2, 0, pos.Y - height/2)
+        box.Size = UDim2.new(0, width, 0, height)
+        box.Visible = true
+
+        -- 名字
+        nameLabel.Text = player.Name
+        nameLabel.Position = UDim2.new(0, pos.X, 0, pos.Y - height/2 - 12)
+        nameLabel.Visible = true
+
+        -- 血量条
+        local healthPercent = humanoid.Health / humanoid.MaxHealth
+        if healthPercent < 1 then
+            local barWidth = 3 -- 宽度和方框差不多
+            healthBg.Position = UDim2.new(0, pos.X - width/2 - 5, 0, pos.Y - height/2)
+            healthBg.Size = UDim2.new(0, barWidth, 0, height)
+            healthBg.Visible = true
+
+            healthBar.Position = UDim2.new(0, pos.X - width/2 - 5, 0, pos.Y - height/2 + height * (1 - healthPercent))
+            healthBar.Size = UDim2.new(0, barWidth, 0, height * healthPercent)
+            healthBar.Visible = true
+        else
+            healthBg.Visible = false
+            healthBar.Visible = false
+        end
+    end
+
+    RunService.RenderStepped:Connect(update)
+end
+
+-- 为已存在的玩家添加ESP
+for _, plr in pairs(Players:GetPlayers()) do
+    setupESP(plr)
+end
+
+-- 新玩家加入时添加
+Players.PlayerAdded:Connect(setupESP)
